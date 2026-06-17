@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#07100c">
+    <meta name="description" content="A daily probability casino played with fictional points.">
+    <title>Gamdle</title>
+    <link rel="stylesheet" href="/styles.css?v=5">
+  </head>
+  <body>
+    <div class="ambient" aria-hidden="true"></div>
+
+    <main id="game-view" class="game-shell" hidden>
+      <header class="topbar">
+        <a class="brand-lockup compact" href="/" aria-label="Gamdle home">
+          <span class="brand-mark" aria-hidden="true">G</span>
+          <span>Gamdle</span>
+        </a>
+        <div class="scoreboard" aria-live="polite">
+          <div><span>Bankroll</span><strong id="bankroll">1,000</strong></div>
+          <div><span>Profit / loss</span><strong id="profit-loss">0</strong></div>
+          <div><span>Move</span><strong><b id="move">0</b> / 12</strong></div>
+        </div>
+        <div class="top-actions">
+          <button id="sound-button" class="icon-text-button" type="button" aria-pressed="true">
+            <span aria-hidden="true">♪</span><b>Sound on</b>
+          </button>
+          <button id="account-button" class="quiet-button" type="button">Account</button>
+        </div>
+      </header>
+
+      <section id="active-run">
+        <div class="session-bar">
+          <div>
+            <p id="date-label"></p>
+            <div id="move-track" class="move-track" aria-label="Daily move progress"></div>
+          </div>
+          <button id="leave-button" class="leave-button" type="button">Leave with current points</button>
+        </div>
+
+        <nav id="game-tabs" class="game-tabs" aria-label="Casino games">
+          <button class="game-tab selected" data-table="wheel" type="button"><span>◉</span> Roulette</button>
+          <button class="game-tab" data-table="cards" type="button"><span>A♠</span> High Card</button>
+          <button class="game-tab" data-table="dice" type="button"><span>⚄</span> Dice Pool</button>
+          <button class="game-tab" data-table="slots" type="button"><span>7</span> Lucky Slots</button>
+        </nav>
+
+        <div class="play-layout">
+          <section class="game-arena" aria-labelledby="arena-title">
+            <div class="arena-heading">
+              <div>
+                <p>Live table</p>
+                <h1 id="arena-title">Roulette</h1>
+              </div>
+            </div>
+
+            <div id="game-stage" class="game-stage">
+              <div id="wheel-stage" class="stage-scene">
+                <div class="roulette-wrap" aria-label="European roulette wheel">
+                  <svg class="roulette-svg" viewBox="0 0 320 320" role="img" aria-label="Roulette wheel">
+                    <defs>
+                      <radialGradient id="wheel-center" cx="50%" cy="40%">
+                        <stop offset="0" stop-color="oklch(0.82 0.15 65)"/>
+                        <stop offset="1" stop-color="oklch(0.42 0.1 65)"/>
+                      </radialGradient>
+                    </defs>
+                    <g id="roulette-wheel">
+                      <circle cx="160" cy="160" r="146" class="wheel-rim"/>
+                      <circle cx="160" cy="160" r="126" class="wheel-pockets"/>
+                      <circle cx="160" cy="160" r="83" class="wheel-bowl"/>
+                      <g id="wheel-numbers"></g>
+                      <circle cx="160" cy="160" r="31" fill="url(#wheel-center)"/>
+                      <circle cx="160" cy="160" r="10" class="wheel-pin"/>
+                    </g>
+                    <g id="roulette-ball-orbit">
+                      <g id="roulette-ball-radius">
+                        <g id="roulette-ball-impact">
+                          <circle cx="160" cy="24" r="7" class="roulette-ball"/>
+                        </g>
+                      </g>
+                    </g>
+                  </svg>
+                  <div class="wheel-result"><span>Last pocket</span><strong id="wheel-result">?</strong></div>
+                </div>
+              </div>
+
+              <div id="cards-stage" class="stage-scene" hidden>
+                <div class="card-table">
+                  <div id="playing-card" class="playing-card">
+                    <div class="card-face card-back">
+                      <div class="card-back-frame"><span>G</span></div>
+                    </div>
+                    <div class="card-face card-front">
+                      <span class="card-corner top"><b data-card-rank></b><i data-card-suit></i></span>
+                      <strong id="card-suit" data-card-suit></strong>
+                      <span class="card-corner bottom"><b data-card-rank></b><i data-card-suit></i></span>
+                      <span id="card-name"></span>
+                    </div>
+                  </div>
+                  <p id="card-stage-copy">The daily card is face down.</p>
+                </div>
+              </div>
+
+              <div id="dice-stage" class="stage-scene" hidden>
+                <div class="dice-table">
+                  <div class="dice-visual">
+                    <div id="dice-box" class="dice-box" aria-hidden="true"></div>
+                    <div id="dice-placeholder" class="dice-placeholder">
+                      <span aria-hidden="true">◆</span>
+                      <p id="dice-placeholder-copy">Dice ready</p>
+                    </div>
+                  </div>
+                  <div class="dice-total"><span>Total</span><strong id="dice-result">?</strong></div>
+                </div>
+              </div>
+
+              <div id="slots-stage" class="stage-scene" hidden>
+                <div class="slot-machine">
+                  <div class="slot-header"><span>GAMDLE</span><strong id="slot-profile-label">STEADY</strong></div>
+                  <div class="reel-window" aria-label="Three slot reels">
+                    <div id="reel-one" class="slot-reel" aria-label="Reel 1 ready"></div>
+                    <div id="reel-two" class="slot-reel" aria-label="Reel 2 ready"></div>
+                    <div id="reel-three" class="slot-reel" aria-label="Reel 3 ready"></div>
+                  </div>
+                  <div class="slot-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+                </div>
+              </div>
+
+              <button id="skip-animation" class="skip-button" type="button" hidden>Skip reveal</button>
+            </div>
+
+            <div id="result-ribbon" class="result-ribbon" role="status" hidden>
+              <div>
+                <span id="result-kicker">Move resolved</span>
+                <strong id="result-title">Wager won</strong>
+                <p id="result-detail"></p>
+              </div>
+              <div class="result-actions">
+                <strong id="result-change">+100</strong>
+                <button id="repeat-button" type="button">Repeat wager</button>
+              </div>
+            </div>
+
+            <section class="bet-surface" aria-labelledby="bet-surface-title">
+              <div class="surface-heading">
+                <div>
+                  <p>Choose an outcome</p>
+                  <h2 id="bet-surface-title">Roulette board</h2>
+                </div>
+                <span id="surface-help">Select one outside bet or exact pocket.</span>
+              </div>
+              <div id="bet-controls" class="bet-controls"></div>
+            </section>
+          </section>
+
+          <aside class="bet-slip mobile-collapsed" aria-labelledby="bet-slip-title">
+            <div class="slip-heading">
+              <div><p>Your wager</p><h2 id="bet-slip-title">Red</h2></div>
+              <div class="slip-heading-actions">
+                <span id="risk-label" class="risk-label">Common</span>
+                <button id="slip-toggle" class="slip-toggle" type="button" aria-expanded="false">Details</button>
+              </div>
+            </div>
+            <dl class="odds-grid">
+              <div><dt>Chance</dt><dd id="chance">48.6%</dd></div>
+              <div><dt>Gross return</dt><dd id="returns">1.97×</dd></div>
+              <div><dt>RTP</dt><dd>96%</dd></div>
+              <div><dt>House edge</dt><dd>4%</dd></div>
+            </dl>
+            <label for="stake">Stake</label>
+            <div class="stake-input">
+              <span aria-hidden="true">◆</span>
+              <input id="stake" type="number" inputmode="numeric" min="1" step="1" value="100">
+            </div>
+            <div class="stake-presets" aria-label="Stake presets">
+              <button type="button" data-percent="0.1">10%</button>
+              <button type="button" data-percent="0.25">25%</button>
+              <button type="button" data-percent="0.5">50%</button>
+              <button type="button" data-percent="1">All in</button>
+            </div>
+            <div class="return-preview">
+              <span>Possible gross return</span>
+              <strong id="potential-return">197 points</strong>
+              <small id="rounding-note">Integer payout after rounding</small>
+            </div>
+            <button id="play-button" class="play-button" type="button">Place wager</button>
+            <p class="slip-note">The result is fixed by today’s seed before you place this wager.</p>
+          </aside>
+        </div>
+
+        <section class="history-section" aria-labelledby="history-title">
+          <div class="section-heading">
+            <h2 id="history-title">Your table history</h2>
+            <span id="history-count">No moves yet</span>
+          </div>
+          <div id="history" class="history-list">
+            <p class="empty-state">Your first result will appear here. Every table is waiting.</p>
+          </div>
+        </section>
+      </section>
+
+      <section id="results-view" class="results-view" hidden>
+        <p class="result-label">Casino closed</p>
+        <h1>You left with <span id="final-bankroll">1,000</span> points.</h1>
+        <p id="result-summary"></p>
+        <div class="result-stats">
+          <div><span>Percentile</span><strong id="percentile">100th</strong></div>
+          <div><span>Players today</span><strong id="player-count">1</strong></div>
+          <div><span>Reached zero</span><strong id="broke-percent">0%</strong></div>
+        </div>
+        <section class="share-card" aria-labelledby="share-title">
+          <div class="share-summary">
+            <span>Gamdle daily result</span>
+            <strong id="share-score">1,000 points</strong>
+            <small id="share-usage"></small>
+          </div>
+          <button id="share-button" type="button">Share result</button>
+          <div id="share-route" class="share-route" aria-label="Route through the casino"></div>
+        </section>
+        <section class="achievement-section">
+          <h2>Achievement cabinet</h2>
+          <div id="achievements" class="achievement-list"></div>
+        </section>
+        <section class="leaderboard-section">
+          <h2>Today’s standings</h2>
+          <div id="leaderboard" class="leaderboard"></div>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="account-dialog">
+      <div class="dialog-heading">
+        <div><p>Your account</p><h2 id="account-email"></h2></div>
+        <button id="account-close" class="icon-button" type="button" aria-label="Close account settings">×</button>
+      </div>
+      <div id="authenticated-settings">
+        <form id="change-email-form" class="settings-form">
+          <label for="new-email">Change email</label>
+          <div class="settings-row">
+            <input id="new-email" type="email" placeholder="new@example.com" required>
+            <button type="submit">Send both links</button>
+          </div>
+          <small>You must open a link sent to both addresses.</small>
+        </form>
+        <div id="account-message" class="message" role="status" hidden></div>
+        <div class="account-actions">
+          <button id="logout-button" type="button">Sign out</button>
+          <button id="delete-button" class="danger-button" type="button">Email deletion link</button>
+        </div>
+      </div>
+      <div id="anonymous-settings" class="anonymous-settings" hidden>
+        <p>You are playing as a guest. This run is kept in memory only and will not be attached to your account if you sign in later.</p>
+        <form id="login-form" class="settings-form">
+          <label for="email">Save future daily runs</label>
+          <div class="settings-row">
+            <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+            <button type="submit">Email login link</button>
+          </div>
+          <small>No password. The link expires after 15 minutes.</small>
+        </form>
+        <div id="login-message" class="message" role="status" hidden></div>
+      </div>
+    </dialog>
+
+    <dialog id="how-to-dialog" class="how-to-dialog" aria-labelledby="how-to-title">
+      <div class="dialog-heading">
+        <div><p>Before your first move</p><h2 id="how-to-title">How Gamdle works</h2></div>
+        <button id="how-to-close" class="icon-button" type="button" aria-label="Close game instructions">×</button>
+      </div>
+      <ol class="how-to-steps">
+        <li><strong>Start with 1,000 points.</strong><span>Choose a game, an outcome, and how much to risk.</span></li>
+        <li><strong>Play up to 12 moves.</strong><span>You can switch tables each move or leave with your current total.</span></li>
+        <li><strong>Everyone gets the same hidden outcomes.</strong><span>Today’s result for each table and move is fixed before anyone wagers.</span></li>
+        <li><strong>Share the route, not the wagers.</strong><span>Your result shows which tables you visited and each gain or loss, without revealing your choices.</span></li>
+      </ol>
+      <button id="how-to-start" class="play-button" type="button">Start playing</button>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+    <script type="module" src="/app.js?v=5"></script>
+  </body>
+</html>

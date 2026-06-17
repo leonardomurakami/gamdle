@@ -1,0 +1,23 @@
+{
+  "name": "gamdle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild frontend/app.js --bundle --format=esm --target=es2022 --outfile=public/app.js && esbuild frontend/dice-box-loader.js --bundle --format=esm --target=es2022 --outfile=public/dice-box.js",
+    "dev": "npm run build && node --watch src/server.js",
+    "start": "npm run build && node src/server.js",
+    "test": "npm run build && node --test"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@3d-dice/dice-box-threejs": "^0.0.12",
+    "motion": "^12.40.0",
+    "pg": "^8.21.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  }
+}

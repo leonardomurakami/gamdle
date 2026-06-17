@@ -1,0 +1,35 @@
+services:
+  gamdle:
+    build:
+      context: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      NODE_ENV: "${NODE_ENV:-development}"
+      PORT: "3000"
+      BASE_URL: "${BASE_URL:-http://localhost:${PORT:-3000}}"
+      DATABASE_URL: "postgres://gamdle:${POSTGRES_PASSWORD:-gamdle}@postgres:5432/gamdle"
+      DAILY_SEED_SECRET: "${DAILY_SEED_SECRET:-development-only-daily-seed}"
+      EMAIL_WEBHOOK_URL: "${EMAIL_WEBHOOK_URL:-}"
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: gamdle
+      POSTGRES_USER: gamdle
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-gamdle}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gamdle -d gamdle"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

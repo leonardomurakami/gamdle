@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gamdle</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="hero">
+        <p class="eyebrow">Daily personal challenge</p>
+        <h1>Gamdle</h1>
+        <p class="lede">
+          Every player receives a private seed, four sorted games, and three plays in each game.
+          Score as many points as you can without sharing answers from a global puzzle order.
+        </p>
+      </section>
+
+      <section class="panel" id="setup-panel">
+        <label for="player-name">Player name or handle</label>
+        <div class="setup-row">
+          <input id="player-name" name="player-name" autocomplete="nickname" placeholder="e.g. alex" />
+          <button id="start-game" type="button">Start game</button>
+        </div>
+        <p class="hint">Your handle creates a stable personal seed for today's set.</p>
+      </section>
+
+      <section class="panel score-panel" aria-live="polite">
+        <div>
+          <span class="label">Seed</span>
+          <strong id="seed-output">—</strong>
+        </div>
+        <div>
+          <span class="label">Total score</span>
+          <strong id="total-score">0</strong>
+        </div>
+        <div>
+          <span class="label">Games left</span>
+          <strong id="games-left">4</strong>
+        </div>
+      </section>
+
+      <section id="games" class="games" aria-live="polite"></section>
+    </main>
+
+    <template id="game-card-template">
+      <article class="game-card">
+        <header>
+          <span class="game-number"></span>
+          <h2></h2>
+        </header>
+        <p class="description"></p>
+        <div class="meta">
+          <span class="plays-left"></span>
+          <span class="best-score"></span>
+        </div>
+        <button class="play-button" type="button">Play</button>
+      </article>
+    </template>
+
+    <script src="src/game.js" type="module"></script>
+  </body>
+</html>

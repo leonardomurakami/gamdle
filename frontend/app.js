@@ -485,9 +485,15 @@ $('#login-form').addEventListener('submit', async (event) => {
     });
     const message = $('#login-message');
     message.hidden = false;
-    message.innerHTML = body.developmentLink
-      ? `${body.message}<br><a href="${body.developmentLink}">Open development login link</a>`
-      : body.message;
+    message.textContent = '';
+    message.append(body.message);
+    if (body.developmentLink) {
+      message.append(document.createElement('br'));
+      const link = document.createElement('a');
+      link.href = body.developmentLink;
+      link.textContent = 'Open development login link';
+      message.append(link);
+    }
   } catch (error) {
     showToast(error.message);
   } finally {
@@ -645,9 +651,17 @@ $('#change-email-form').addEventListener('submit', async (event) => {
     });
     const message = $('#account-message');
     message.hidden = false;
-    message.innerHTML = body.developmentLinks
-      ? `${body.message}<br>${body.developmentLinks.map((link, index) => `<a href="${link}">Open ${index ? 'new' : 'current'} email link</a>`).join('<br>')}`
-      : body.message;
+    message.textContent = '';
+    message.append(body.message);
+    if (body.developmentLinks) {
+      for (const [index, url] of body.developmentLinks.entries()) {
+        message.append(document.createElement('br'));
+        const link = document.createElement('a');
+        link.href = url;
+        link.textContent = `Open ${index ? 'new' : 'current'} email link`;
+        message.append(link);
+      }
+    }
   } catch (error) {
     showToast(error.message);
   }
@@ -659,9 +673,15 @@ $('#delete-button').addEventListener('click', async () => {
     const body = await api('/api/account/delete', { method: 'POST', body: '{}' });
     const message = $('#account-message');
     message.hidden = false;
-    message.innerHTML = body.developmentLink
-      ? `${body.message}<br><a href="${body.developmentLink}">Open development deletion link</a>`
-      : body.message;
+    message.textContent = '';
+    message.append(body.message);
+    if (body.developmentLink) {
+      message.append(document.createElement('br'));
+      const link = document.createElement('a');
+      link.href = body.developmentLink;
+      link.textContent = 'Open development deletion link';
+      message.append(link);
+    }
   } catch (error) {
     showToast(error.message);
   }

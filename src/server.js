@@ -29,13 +29,23 @@ import {
 const db = await createDatabase(config);
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
+function securityHeaders() {
+  const headers = {
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'X-Frame-Options': 'DENY',
+  };
+  if (config.isProduction) headers['Strict-Transport-Security'] = 'max-age=63072000; includeSubDomains';
+  return headers;
+}
+
 function json(res, status, body, headers = {}) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...headers });
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...securityHeaders(), ...headers });
   res.end(JSON.stringify(body));
 }
 
 function redirect(res, location, headers = {}) {
-  res.writeHead(303, { Location: location, ...headers });
+  res.writeHead(303, { Location: location, ...securityHeaders(), ...headers });
   res.end();
 }
 
@@ -321,7 +331,8 @@ async function handleApi(req, res, url) {
     const { date, bankroll } = await readJson(req);
     if (date !== utcDate()) return json(res, 400, { error: 'Anonymous runs expire when the daily casino changes.' });
     const finalBankroll = Number(bankroll);
-    if (!Number.isInteger(finalBankroll) || finalBankroll < 0) {
+    const maxAnonymousBankroll = STARTING_BANKROLL * MAX_MOVES;
+    if (!Number.isInteger(finalBankroll) || finalBankroll < 0 || finalBankroll > maxAnonymousBankroll) {
       return json(res, 400, { error: 'Invalid bankroll.' });
     }
     return json(res, 200, { status: 'left', results: await anonymousResults(date, finalBankroll) });
@@ -474,8 +485,7 @@ function serveStatic(res, pathname) {
     'Content-Type': entry[1],
     'Cache-Control': config.isProduction && pathname !== '/' ? 'public, max-age=3600' : 'no-cache',
     'Content-Security-Policy': "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
-    'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'no-referrer',
+    ...securityHeaders(),
   });
   res.end(content);
   return true;

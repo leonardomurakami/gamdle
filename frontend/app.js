@@ -397,7 +397,11 @@ async function placeWager() {
     });
     state.lastWager = wager;
     setPhase('animating');
-    await gameAnimations.play(wager.table, body.resolution);
+    try {
+      await gameAnimations.play(wager.table, body.resolution);
+    } catch {
+      // Animation failure should not block state update.
+    }
     if (state.mode === 'guest') {
       state.run = {
         ...state.run,
@@ -460,8 +464,12 @@ async function initialize() {
   try {
     const { user } = await api('/api/me');
     await loadGame(user ? 'account' : 'guest');
-  } catch (error) {
-    showToast(error.message);
+  } catch {
+    try {
+      await loadGame('guest');
+    } catch (fallbackError) {
+      showToast(fallbackError.message);
+    }
   }
 }
 
@@ -618,7 +626,11 @@ $('#account-close').addEventListener('click', () => $('#account-dialog').close()
 $('#how-to-close').addEventListener('click', () => $('#how-to-dialog').close());
 $('#how-to-start').addEventListener('click', () => $('#how-to-dialog').close());
 $('#logout-button').addEventListener('click', async () => {
-  await api('/api/auth/logout', { method: 'POST', body: '{}' });
+  try {
+    await api('/api/auth/logout', { method: 'POST', body: '{}' });
+  } catch {
+    // Clear local session even if the server request fails.
+  }
   state.developmentSession = null;
   storage.remove('gamdle-dev-session');
   location.reload();

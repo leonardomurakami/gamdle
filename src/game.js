@@ -1,6 +1,13 @@
 import crypto from 'node:crypto';
 import { RED_NUMBERS } from './roulette-colors.js';
 
+export class GameError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'GameError';
+  }
+}
+
 export const RULES_VERSION = 2;
 export const STARTING_BANKROLL = 1000;
 export const MAX_MOVES = 12;
@@ -59,7 +66,7 @@ function deterministicBytes(secret, date, move, table) {
 
 export function eventFor(secret, date, move, table) {
   if (!TABLES.includes(table) || move < 1 || move > MAX_MOVES) {
-    throw new Error('Invalid table or move.');
+    throw new GameError('Invalid table or move.');
   }
   const bytes = deterministicBytes(secret, date, move, table);
   const primary = bytes.readUInt32BE(0);
@@ -102,20 +109,20 @@ function wheelResolution(event, bet) {
   if (bet.type === 'exact' && Number.isInteger(number) && number >= 0 && number <= 36) {
     return binaryResolution(event.pocket === number, 1 / 37, `Pocket ${event.pocket}, ${color}`);
   }
-  throw new Error('Invalid roulette wager.');
+  throw new GameError('Invalid roulette wager.');
 }
 
 function cardResolution(event, bet) {
   const threshold = Number(bet.threshold);
   const cardName = `${RANK_NAMES[event.rank] || event.rank} of ${event.suit}`;
-  if (!Number.isInteger(threshold)) throw new Error('Choose a card threshold.');
+  if (!Number.isInteger(threshold)) throw new GameError('Choose a card threshold.');
   if (bet.direction === 'over' && threshold >= 1 && threshold <= 12) {
     return binaryResolution(event.rank > threshold, (13 - threshold) / 13, cardName);
   }
   if (bet.direction === 'under' && threshold >= 2 && threshold <= 13) {
     return binaryResolution(event.rank < threshold, (threshold - 1) / 13, cardName);
   }
-  throw new Error('Invalid High Card wager.');
+  throw new GameError('Invalid High Card wager.');
 }
 
 function diceResolution(event, bet) {
@@ -131,7 +138,7 @@ function diceResolution(event, bet) {
     const ways = 6 - Math.abs(7 - target);
     return binaryResolution(total === target, ways / 36, label);
   }
-  throw new Error('Invalid Dice Pool wager.');
+  throw new GameError('Invalid Dice Pool wager.');
 }
 
 function slotOutcome(profile, roll) {
@@ -146,7 +153,7 @@ function slotOutcome(profile, roll) {
 
 function slotsResolution(event, bet) {
   const profile = SLOT_PROFILES[bet.profile];
-  if (!profile) throw new Error('Invalid slot volatility.');
+  if (!profile) throw new GameError('Invalid slot volatility.');
   const outcome = slotOutcome(profile, event.roll);
   return {
     won: outcome.multiplier > 0,
@@ -164,12 +171,12 @@ export function resolveWager(table, event, bet) {
   if (table === 'cards') return cardResolution(event, bet);
   if (table === 'dice') return diceResolution(event, bet);
   if (table === 'slots') return slotsResolution(event, bet);
-  throw new Error('Unknown table.');
+  throw new GameError('Unknown table.');
 }
 
 export function applyWager(bankroll, stake, resolution) {
   if (!Number.isInteger(stake) || stake < 1 || stake > bankroll) {
-    throw new Error('Stake must be a whole number within your bankroll.');
+    throw new GameError('Stake must be a whole number within your bankroll.');
   }
   const returned = resolution.won ? Math.floor(stake * resolution.multiplier) : 0;
   const nextBankroll = bankroll - stake + returned;

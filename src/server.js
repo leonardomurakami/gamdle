@@ -16,6 +16,7 @@ import {
 } from './auth.js';
 import {
   ACHIEVEMENTS,
+  GameError,
   MAX_MOVES,
   STARTING_BANKROLL,
   achievementKeys,
@@ -91,12 +92,21 @@ async function deliverEmail(to, subject, text, html) {
     console.log(`[Gamdle email] ${to}\n${text}`);
     return;
   }
-  const response = await fetch(config.emailWebhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to, subject, text, html }),
-  });
-  if (!response.ok) throw new Error('Email delivery failed.');
+  let response;
+  try {
+    response = await fetch(config.emailWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, subject, text, html }),
+    });
+  } catch (error) {
+    console.error('Email webhook network error:', error);
+    throw new Error('Email delivery failed.');
+  }
+  if (!response.ok) {
+    console.error(`Email webhook returned ${response.status} for ${to}`);
+    throw new Error('Email delivery failed.');
+  }
 }
 
 async function sendLink(email, purpose, userId = null, metadata = null) {
@@ -129,11 +139,25 @@ async function getOrCreateRun(userId) {
     VALUES (?, ?, ?, 0, 'active', ?)
     RETURNING id
   `, userId, date, STARTING_BANKROLL, now);
-  return await db.get('SELECT * FROM daily_runs WHERE id = ?', result.lastInsertRowid);
+  const run = await db.get('SELECT * FROM daily_runs WHERE id = ?', result.lastInsertRowid);
+  if (!run) throw new Error('Failed to create daily run.');
+  return run;
 }
 
 function serializeWager(row) {
-  const bet = JSON.parse(row.bet_json);
+  let bet, event;
+  try {
+    bet = JSON.parse(row.bet_json);
+  } catch {
+    console.error(`Corrupt bet_json in wager ${row.id}`);
+    bet = { selection: null, resultLabel: 'Unknown' };
+  }
+  try {
+    event = JSON.parse(row.event_json);
+  } catch {
+    console.error(`Corrupt event_json in wager ${row.id}`);
+    event = {};
+  }
   return {
     move: row.move_number,
     table: row.table_key,
@@ -143,7 +167,7 @@ function serializeWager(row) {
     multiplier: row.multiplier,
     bankrollAfter: row.bankroll_after,
     netChange: row.net_change,
-    event: JSON.parse(row.event_json),
+    event,
     bet: bet.selection,
     resultLabel: bet.resultLabel,
   };
@@ -313,7 +337,8 @@ async function handleApi(req, res, url) {
         },
       });
     } catch (error) {
-      return json(res, 400, { error: error.message });
+      if (error instanceof GameError) return json(res, 400, { error: error.message });
+      throw error;
     }
   }
 
@@ -369,7 +394,8 @@ async function handleApi(req, res, url) {
         },
       });
     } catch (error) {
-      return json(res, 400, { error: error.message });
+      if (error instanceof GameError) return json(res, 400, { error: error.message });
+      throw error;
     }
   }
 
@@ -444,7 +470,13 @@ async function handleVerification(res, url) {
   }
 
   if (token.purpose.startsWith('email_change_')) {
-    const { requestId } = JSON.parse(token.metadata || '{}');
+    let requestId;
+    try {
+      ({ requestId } = JSON.parse(token.metadata || '{}'));
+    } catch {
+      return redirect(res, '/?auth=invalid');
+    }
+    if (!requestId) return redirect(res, '/?auth=invalid');
     const column = token.purpose === 'email_change_old' ? 'old_verified_at' : 'new_verified_at';
     await db.run(`UPDATE email_changes SET ${column} = ? WHERE id = ? AND expires_at > ? AND completed_at IS NULL`,
       now, requestId, now);

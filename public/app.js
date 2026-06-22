@@ -1,85 +1,3 @@
-// frontend/reveal-controller.js
-function createRevealController(skipButton) {
-  let controls = [];
-  let settle = null;
-  let settled = true;
-  let skipTimer = null;
-  let resolveCompletion = null;
-  let completion = Promise.resolve();
-  function reducedMotion() {
-    return matchMedia("(prefers-reduced-motion: reduce)").matches;
-  }
-  function begin(finalizer) {
-    cancel();
-    settle = finalizer;
-    settled = false;
-    completion = new Promise((resolve) => {
-      resolveCompletion = resolve;
-    });
-    skipButton.hidden = true;
-    if (!reducedMotion()) {
-      skipTimer = setTimeout(() => {
-        if (!settled) skipButton.hidden = false;
-      }, 500);
-    }
-  }
-  function track(control) {
-    controls.push(control);
-    return control;
-  }
-  function finish() {
-    if (settled) return;
-    settled = true;
-    clearTimeout(skipTimer);
-    skipButton.hidden = true;
-    controls.forEach((control) => {
-      try {
-        control.stop();
-      } catch {
-      }
-    });
-    controls = [];
-    const finalizer = settle;
-    settle = null;
-    finalizer?.();
-    resolveCompletion?.();
-    resolveCompletion = null;
-  }
-  function cancel() {
-    clearTimeout(skipTimer);
-    controls.forEach((control) => {
-      try {
-        control.stop();
-      } catch {
-      }
-    });
-    controls = [];
-    settle = null;
-    settled = true;
-    resolveCompletion?.();
-    resolveCompletion = null;
-    skipButton.hidden = true;
-  }
-  async function wait(control) {
-    try {
-      return await Promise.race([control, completion]);
-    } catch {
-      return void 0;
-    }
-  }
-  async function playReveal(resolution, settle2, animate2) {
-    begin(() => settle2(resolution));
-    if (reducedMotion()) {
-      finish();
-      return;
-    }
-    await animate2(resolution);
-    finish();
-  }
-  skipButton.addEventListener("click", finish);
-  return { begin, track, finish, cancel, wait, reducedMotion, playReveal };
-}
-
 // node_modules/motion-utils/dist/es/array.mjs
 function addUniqueItem(arr, item) {
   if (arr.indexOf(item) === -1)
@@ -4923,6 +4841,88 @@ function createScopedAnimate(options = {}) {
 }
 var animate = createScopedAnimate();
 
+// frontend/reveal-controller.js
+function createRevealController(skipButton) {
+  let controls = [];
+  let settle = null;
+  let settled = true;
+  let skipTimer = null;
+  let resolveCompletion = null;
+  let completion = Promise.resolve();
+  function reducedMotion() {
+    return matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+  function begin(finalizer) {
+    cancel();
+    settle = finalizer;
+    settled = false;
+    completion = new Promise((resolve) => {
+      resolveCompletion = resolve;
+    });
+    skipButton.hidden = true;
+    if (!reducedMotion()) {
+      skipTimer = setTimeout(() => {
+        if (!settled) skipButton.hidden = false;
+      }, 500);
+    }
+  }
+  function track(control) {
+    controls.push(control);
+    return control;
+  }
+  function finish() {
+    if (settled) return;
+    settled = true;
+    clearTimeout(skipTimer);
+    skipButton.hidden = true;
+    controls.forEach((control) => {
+      try {
+        control.stop();
+      } catch {
+      }
+    });
+    controls = [];
+    const finalizer = settle;
+    settle = null;
+    finalizer?.();
+    resolveCompletion?.();
+    resolveCompletion = null;
+  }
+  function cancel() {
+    clearTimeout(skipTimer);
+    controls.forEach((control) => {
+      try {
+        control.stop();
+      } catch {
+      }
+    });
+    controls = [];
+    settle = null;
+    settled = true;
+    resolveCompletion?.();
+    resolveCompletion = null;
+    skipButton.hidden = true;
+  }
+  async function wait(control) {
+    try {
+      return await Promise.race([control, completion]);
+    } catch {
+      return void 0;
+    }
+  }
+  async function playReveal(resolution, settle2, animate2) {
+    begin(() => settle2(resolution));
+    if (reducedMotion()) {
+      finish();
+      return;
+    }
+    await animate2(resolution);
+    finish();
+  }
+  skipButton.addEventListener("click", finish);
+  return { begin, track, finish, cancel, wait, reducedMotion, playReveal };
+}
+
 // src/roulette-colors.js
 var RED_NUMBERS = /* @__PURE__ */ new Set([
   1,
@@ -5298,7 +5298,7 @@ function createSlotsReveal({ controller, sound: sound2 }) {
         const strip = reel.querySelector(".reel-strip");
         const landing = slotLanding(resolution.event.symbols[index], REEL_CYCLES);
         const target = offsetFor(reel, landing.itemIndex);
-        const duration = 1.35 + index * 0.26;
+        const duration = 1.2 + index * 0.18;
         const control = controller.track(animate(
           strip,
           {
@@ -5390,6 +5390,11 @@ function createSound(getEnabled) {
 }
 
 // frontend/app.js
+var ANON_STATE_KEY = "gamdle-anonymous-run";
+var FIRST_PLAY_KEY = "gamdle-first-play-seen";
+var SLOT_TIERS = ["silver", "gold", "diamond"];
+var PLAYS_PER_GAME = 3;
+var GAMES_PER_RUN = 4;
 var storage = {
   get(key) {
     try {
@@ -5409,6 +5414,16 @@ var storage = {
       window.localStorage?.removeItem(key);
     } catch {
     }
+  },
+  getJson(key) {
+    try {
+      return JSON.parse(storage.get(key));
+    } catch {
+      return null;
+    }
+  },
+  setJson(key, value) {
+    storage.set(key, JSON.stringify(value));
   }
 };
 var state = {
@@ -5423,12 +5438,17 @@ var state = {
   soundEnabled: storage.get("gamdle-sound") !== "off",
   developmentSession: storage.get("gamdle-dev-session")
 };
-var FIRST_PLAY_KEY = "gamdle-first-play-seen";
 var tableNames = {
   wheel: "Roulette",
   cards: "High Card",
   dice: "Dice Pool",
   slots: "Lucky Slots"
+};
+var tableIcons = {
+  wheel: "\u25C9",
+  cards: "A\u2660",
+  dice: "\u2684",
+  slots: "7"
 };
 var ROULETTE_TABLE_POSITIONS = new Map([
   [0, { rowClass: "roulette-zero-cell", columnClass: "roulette-col-1" }],
@@ -5457,6 +5477,19 @@ var ordinal = (number2) => {
 };
 var sound = createSound(() => state.soundEnabled);
 var gameAnimations = null;
+function currentGameIndex() {
+  return Math.min(Math.floor(state.run.move / PLAYS_PER_GAME), GAMES_PER_RUN - 1);
+}
+function currentPlayIndex() {
+  return state.run.move % PLAYS_PER_GAME;
+}
+function activeTable() {
+  const gameOrder = state.run.gameOrder || [];
+  return gameOrder[currentGameIndex()] || "wheel";
+}
+function slotTierForPlay(playIndex) {
+  return SLOT_TIERS[Math.min(playIndex, SLOT_TIERS.length - 1)];
+}
 async function api(path, options = {}) {
   const developmentSession = state.developmentSession;
   const response = await fetch(path, {
@@ -5503,41 +5536,43 @@ function setPhase(phase) {
   $("#play-button").disabled = locked || state.run?.status !== "active";
   $("#play-button").textContent = phase === "committing" ? "Locking wager\u2026" : phase === "animating" ? "Revealing\u2026" : "Place wager";
   $("#stake").disabled = locked;
-  $$(".choice-button, .game-tab, [data-percent]").forEach((button) => {
+  $$(".choice-button, [data-percent]").forEach((button) => {
     button.disabled = locked;
   });
   $("#repeat-button").disabled = locked || state.run?.status !== "active";
-}
-function slotSelection(profile) {
-  return {
-    key: `slots-${profile.key}`,
-    label: profile.name,
-    probability: profile.winProbability,
-    multiplier: profile.maxMultiplier,
-    risk: profile.risk,
-    bet: { profile: profile.key },
-    profile,
-    variableReturn: true
-  };
 }
 function defaultSelection(table) {
   const rules = state.rules.games[table];
   if (table === "wheel") return rules.outsideBets[0];
   if (table === "cards") return rules.bets.find((bet) => bet.key === "cards-over-7");
   if (table === "dice") return rules.rangeBets[0];
-  return slotSelection(rules.profiles[0]);
+  return null;
 }
 function setSelection(selection) {
   if (!selection) return;
   state.selection = selection;
   $$(".choice-button").forEach((button) => {
-    const selected = Boolean(button.dataset.key === selection.key || button.dataset.cardDirection && button.dataset.cardDirection === selection.bet?.direction || button.dataset.threshold && Number(button.dataset.threshold) === selection.bet?.threshold || button.dataset.profile && button.dataset.profile === selection.profile?.key);
+    const selected = Boolean(button.dataset.key === selection.key || button.dataset.cardDirection && button.dataset.cardDirection === selection.bet?.direction || button.dataset.threshold && Number(button.dataset.threshold) === selection.bet?.threshold);
     button.classList.toggle("selected", selected);
     button.setAttribute("aria-pressed", String(selected));
   });
   renderBetSlip();
 }
 function renderBetSlip() {
+  const table = activeTable();
+  if (table === "slots") {
+    const tier = slotTierForPlay(currentPlayIndex());
+    const tierData = state.rules.games.slots.tiers.find((t) => t.key === tier);
+    if (!tierData) return;
+    $("#bet-slip-title").textContent = `${tierData.name} Machine`;
+    $("#risk-label").textContent = tierData.risk;
+    $("#chance").textContent = percent2(tierData.winProbability);
+    $("#returns").textContent = `Up to ${multiplier(tierData.maxMultiplier)}`;
+    const stake2 = Math.max(0, Number($("#stake").value || 0));
+    const gross2 = Math.floor(stake2 * tierData.maxMultiplier);
+    $("#potential-return").textContent = `Up to ${format(gross2)} points`;
+    return;
+  }
   if (!state.selection) return;
   const selection = state.selection;
   $("#bet-slip-title").textContent = selection.label;
@@ -5606,21 +5641,14 @@ function renderDiceControls() {
     </div>`;
 }
 function renderSlotControls() {
-  const profiles = state.rules.games.slots.profiles;
-  const selectedKey = state.selection?.profile?.key || "steady";
-  const selected = profiles.find((profile) => profile.key === selectedKey) || profiles[0];
-  $("#bet-surface-title").textContent = "Volatility and paytable";
-  $("#surface-help").textContent = "Every profile returns 96% over many spins.";
+  const tier = slotTierForPlay(currentPlayIndex());
+  const tierData = state.rules.games.slots.tiers.find((t) => t.key === tier);
+  if (!tierData) return;
+  $("#bet-surface-title").textContent = `${tierData.name} Machine Paytable`;
+  $("#surface-help").textContent = "Every tier returns 96% over many spins.";
   $("#bet-controls").innerHTML = `
-    <div class="choice-grid slot-profiles">
-      ${profiles.map((profile) => `
-        <button class="choice-button profile-button" data-profile="${profile.key}" type="button">
-          <strong>${profile.name}</strong>
-          <small>${percent2(profile.winProbability)} pays anything</small>
-        </button>`).join("")}
-    </div>
     <div class="paytable">
-      ${selected.outcomes.map((outcome) => `
+      ${tierData.outcomes.map((outcome) => `
         <div class="pay-row">
           <span>${outcome.symbols.map((symbol) => SLOT_SYMBOL_GLYPHS[symbol]).join(" ")}</span>
           <b>${percent2(outcome.probability)}</b>
@@ -5629,31 +5657,41 @@ function renderSlotControls() {
     </div>`;
 }
 function renderControls() {
-  if (state.table === "wheel") renderWheelControls();
-  if (state.table === "cards") renderCardControls();
-  if (state.table === "dice") renderDiceControls();
-  if (state.table === "slots") renderSlotControls();
-  setSelection(state.selection || defaultSelection(state.table));
+  const table = activeTable();
+  if (table === "wheel") renderWheelControls();
+  if (table === "cards") renderCardControls();
+  if (table === "dice") renderDiceControls();
+  if (table === "slots") renderSlotControls();
+  if (table !== "slots") {
+    setSelection(state.selection || defaultSelection(table));
+  } else {
+    renderBetSlip();
+  }
 }
 function renderStage() {
+  const table = activeTable();
   $$(".stage-scene").forEach((scene) => {
     scene.hidden = true;
   });
-  $(`#${state.table}-stage`).hidden = false;
-  $("#arena-title").textContent = tableNames[state.table];
-  $$(".game-tab").forEach((tab) => tab.classList.toggle("selected", tab.dataset.table === state.table));
-  if (state.table === "slots") {
-    $("#slot-profile-label").textContent = (state.selection?.profile?.name || "Steady").toUpperCase();
-    const profile = state.selection?.profile?.key || "steady";
-    $(".slot-machine").className = `slot-machine slot-${profile}`;
+  $(`#${table}-stage`).hidden = false;
+  $("#arena-title").textContent = tableNames[table];
+  if (table === "slots") {
+    const tier = slotTierForPlay(currentPlayIndex());
+    $("#slot-tier-label").textContent = tier.toUpperCase();
+    $(".slot-machine").className = `slot-machine slot-${tier}`;
   }
 }
 function renderMoveTrack() {
-  $("#move-track").innerHTML = Array.from({ length: state.rules.maxMoves }, (_, index) => {
-    const move = index + 1;
-    const className = move <= state.run.move ? "complete" : move === state.run.move + 1 ? "current" : "";
-    return `<i class="move-dot ${className}" aria-label="Move ${move}${move <= state.run.move ? " complete" : ""}"></i>`;
+  const gameOrder = state.run.gameOrder || [];
+  const html = gameOrder.map((table, gIdx) => {
+    const dots = Array.from({ length: PLAYS_PER_GAME }, (_, pIdx) => {
+      const moveNum = gIdx * PLAYS_PER_GAME + pIdx;
+      const className = moveNum < state.run.move ? "complete" : moveNum === state.run.move ? "current" : "";
+      return `<i class="move-dot ${className}" aria-label="Game ${gIdx + 1} play ${pIdx + 1}${moveNum < state.run.move ? " complete" : ""}"></i>`;
+    }).join("");
+    return `<div class="move-group" title="${tableNames[table]}">${dots}</div>`;
   }).join("");
+  $("#move-track").innerHTML = html;
 }
 function renderHistory() {
   const history2 = $("#history");
@@ -5705,7 +5743,10 @@ function renderResults() {
 }
 function renderRun() {
   $("#bankroll").textContent = format(state.run.bankroll);
-  $("#move").textContent = state.run.move;
+  const gameIdx = currentGameIndex();
+  const playIdx = currentPlayIndex();
+  $("#game-label").textContent = `${gameIdx + 1} / ${GAMES_PER_RUN}`;
+  $("#play-label").textContent = `${playIdx + 1} / ${PLAYS_PER_GAME}`;
   const profitLoss = state.run.bankroll - state.rules.startingBankroll;
   $("#profit-loss").textContent = signedFormat(profitLoss);
   $("#profit-loss").className = changeClass(profitLoss);
@@ -5726,7 +5767,9 @@ function showResolution(resolution) {
   const ribbon = $("#result-ribbon");
   ribbon.hidden = false;
   ribbon.classList.toggle("loss", !resolution.won);
-  $("#result-kicker").textContent = `Move ${state.run.move} resolved`;
+  const gameIdx = currentGameIndex();
+  const playIdx = currentPlayIndex();
+  $("#result-kicker").textContent = `Game ${gameIdx + 1}, Play ${playIdx} resolved`;
   $("#result-title").textContent = resolution.won ? "Wager won" : "Wager lost";
   $("#result-detail").textContent = `${resolution.label}. Bankroll: ${format(resolution.bankroll)} points.`;
   $("#result-change").textContent = signedFormat(resolution.netChange);
@@ -5734,15 +5777,60 @@ function showResolution(resolution) {
   $("#repeat-button").hidden = state.run.status !== "active";
   sound.play("result", resolution.won);
 }
+async function showGameTransition(nextTable) {
+  const overlay = $("#game-transition");
+  const icon = overlay.querySelector(".transition-icon");
+  const title = overlay.querySelector(".transition-title");
+  const subtitle = overlay.querySelector(".transition-subtitle");
+  icon.textContent = tableIcons[nextTable] || "";
+  title.textContent = tableNames[nextTable] || nextTable;
+  subtitle.textContent = `Game ${currentGameIndex() + 1} of ${GAMES_PER_RUN}`;
+  overlay.hidden = false;
+  overlay.style.opacity = "0";
+  const fadeIn = animate(overlay, { opacity: [0, 1] }, { duration: 0.4, ease: "easeOut" });
+  await fadeIn.finished;
+  await new Promise((resolve) => setTimeout(resolve, 1800));
+  const fadeOut = animate(overlay, { opacity: [1, 0] }, { duration: 0.4, ease: "easeIn" });
+  await fadeOut.finished;
+  overlay.hidden = true;
+}
+function saveAnonymousState() {
+  if (state.mode !== "guest") return;
+  storage.setJson(ANON_STATE_KEY, {
+    date: state.run.date,
+    seed: state.run.seed,
+    gameOrder: state.run.gameOrder,
+    bankroll: state.run.bankroll,
+    move: state.run.move,
+    movesRemaining: state.run.movesRemaining,
+    status: state.run.status,
+    wagers: state.run.wagers,
+    achievements: state.run.achievements,
+    results: state.run.results || null
+  });
+}
+function loadAnonymousState() {
+  const saved = storage.getJson(ANON_STATE_KEY);
+  if (!saved) return null;
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  if (saved.date !== today) {
+    storage.remove(ANON_STATE_KEY);
+    return null;
+  }
+  return saved;
+}
 async function placeWager() {
   if (state.phase === "committing" || state.phase === "animating") return;
   sound.initialize();
+  const table = activeTable();
   const stake = Number($("#stake").value);
+  const bet = table === "slots" ? {} : structuredClone(state.selection?.bet || {});
+  const prevGameIndex = currentGameIndex();
   const wager = {
-    table: state.table,
+    table,
     stake,
-    bet: structuredClone(state.selection.bet),
-    selection: structuredClone(state.selection)
+    bet,
+    selection: table === "slots" ? null : structuredClone(state.selection)
   };
   setPhase("committing");
   $("#result-ribbon").hidden = true;
@@ -5751,35 +5839,53 @@ async function placeWager() {
     const body = await api(path, {
       method: "POST",
       body: JSON.stringify({
-        table: wager.table,
         stake,
-        bet: wager.bet,
+        bet: table === "slots" ? {} : bet,
         ...state.mode === "guest" ? {
           date: state.run.date,
           move: state.run.move,
-          bankroll: state.run.bankroll
+          bankroll: state.run.bankroll,
+          seed: state.run.seed,
+          gameOrder: state.run.gameOrder
         } : {}
       })
     });
     state.lastWager = wager;
     setPhase("animating");
-    await gameAnimations.play(wager.table, body.resolution);
+    try {
+      await gameAnimations.play(table, body.resolution);
+    } catch {
+    }
     if (state.mode === "guest") {
       state.run = {
         ...state.run,
         bankroll: body.resolution.bankroll,
         move: body.wager.move,
-        movesRemaining: state.rules.maxMoves - body.wager.move,
+        movesRemaining: state.rules.gamesPerRun * state.rules.playsPerGame - body.wager.move,
         status: body.status,
         wagers: [...state.run.wagers, body.wager],
+        currentGame: body.currentGame,
         ...body.results ? { results: body.results } : {}
       };
     } else {
       state.run = body.run;
     }
+    saveAnonymousState();
+    const newGameIndex = currentGameIndex();
+    const crossedGameBoundary = newGameIndex > prevGameIndex && state.run.status === "active";
     renderRun();
     showResolution(body.resolution);
     setPhase("settled");
+    if (crossedGameBoundary) {
+      const nextTable = activeTable();
+      await showGameTransition(nextTable);
+      state.table = nextTable;
+      state.selection = defaultSelection(nextTable);
+      renderStage();
+      renderControls();
+      gameAnimations.reset(nextTable);
+      $("#result-ribbon").hidden = true;
+    }
   } catch (error) {
     showToast(error.message);
     setPhase("idle");
@@ -5795,12 +5901,37 @@ function showFirstPlayGuide() {
   $("#how-to-dialog").showModal();
 }
 async function loadGame(mode = "account") {
+  if (mode === "guest") {
+    const saved = loadAnonymousState();
+    if (saved) {
+      state.mode = "guest";
+      state.user = null;
+      const rulesBody = await api("/api/game/anonymous");
+      state.rules = rulesBody.rules;
+      state.run = saved;
+      state.table = activeTable();
+      state.selection = defaultSelection(state.table);
+      $("#game-view").hidden = false;
+      $("#account-email").textContent = "Guest player";
+      $("#account-button").textContent = "Sign in";
+      $("#authenticated-settings").hidden = true;
+      $("#anonymous-settings").hidden = false;
+      gameAnimations = createGameAnimations(sound);
+      renderStage();
+      renderControls();
+      renderRun();
+      updateSoundButton();
+      return;
+    }
+  }
   const body = await api(mode === "guest" ? "/api/game/anonymous" : "/api/game");
   state.mode = mode;
   state.user = body.user;
   state.rules = body.rules;
   state.run = body.run;
+  state.table = activeTable();
   state.selection = defaultSelection(state.table);
+  saveAnonymousState();
   $("#game-view").hidden = false;
   $("#account-email").textContent = mode === "guest" ? "Guest player" : state.user.email;
   $("#account-button").textContent = mode === "guest" ? "Sign in" : "Account";
@@ -5822,8 +5953,12 @@ async function initialize() {
   try {
     const { user } = await api("/api/me");
     await loadGame(user ? "account" : "guest");
-  } catch (error) {
-    showToast(error.message);
+  } catch {
+    try {
+      await loadGame("guest");
+    } catch (fallbackError) {
+      showToast(fallbackError.message);
+    }
   }
 }
 $("#login-form").addEventListener("submit", async (event) => {
@@ -5854,21 +5989,12 @@ $("#login-form").addEventListener("submit", async (event) => {
     button.textContent = "Email login link";
   }
 });
-$("#game-tabs").addEventListener("click", (event) => {
-  const tab = event.target.closest("[data-table]");
-  if (!tab || state.phase === "committing" || state.phase === "animating") return;
-  state.table = tab.dataset.table;
-  state.selection = defaultSelection(state.table);
-  $("#result-ribbon").hidden = true;
-  renderStage();
-  renderControls();
-  gameAnimations.reset(state.table);
-});
 $("#bet-controls").addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (!button || state.phase === "committing" || state.phase === "animating") return;
+  const table = activeTable();
   if (button.dataset.key) {
-    const rules = state.rules.games[state.table];
+    const rules = state.rules.games[table];
     const candidates = [
       ...rules.outsideBets || [],
       ...rules.rangeBets || [],
@@ -5889,13 +6015,6 @@ $("#bet-controls").addEventListener("click", (event) => {
     const selection = state.rules.games.cards.bets.find((bet) => bet.bet.threshold === threshold && bet.bet.direction === button.dataset.cardDirection);
     if (selection) setSelection(selection);
   }
-  if (button.dataset.profile) {
-    const profile = state.rules.games.slots.profiles.find((item) => item.key === button.dataset.profile);
-    state.selection = slotSelection(profile);
-    $("#slot-profile-label").textContent = profile.name.toUpperCase();
-    $(".slot-machine").className = `slot-machine slot-${profile.key}`;
-    renderControls();
-  }
 });
 $("#stake").addEventListener("input", renderBetSlip);
 $("#slip-toggle").addEventListener("click", () => {
@@ -5913,10 +6032,11 @@ $$("[data-percent]").forEach((button) => {
 $("#play-button").addEventListener("click", placeWager);
 $("#repeat-button").addEventListener("click", async () => {
   if (!state.lastWager || state.run.status !== "active") return;
-  state.table = state.lastWager.table;
-  state.selection = state.lastWager.selection;
+  const table = activeTable();
+  if (state.lastWager.table === table && state.lastWager.selection) {
+    state.selection = state.lastWager.selection;
+  }
   $("#stake").value = Math.min(state.lastWager.stake, state.run.bankroll);
-  renderStage();
   renderControls();
   renderBetSlip();
   await placeWager();
@@ -5939,6 +6059,7 @@ $("#leave-button").addEventListener("click", async () => {
       body: JSON.stringify(anonymous ? { date: state.run.date, bankroll: state.run.bankroll } : {})
     });
     state.run = anonymous ? { ...state.run, status: body.status, results: body.results } : body.run;
+    saveAnonymousState();
     renderRun();
   } catch (error) {
     showToast(error.message);
@@ -5969,7 +6090,10 @@ $("#account-close").addEventListener("click", () => $("#account-dialog").close()
 $("#how-to-close").addEventListener("click", () => $("#how-to-dialog").close());
 $("#how-to-start").addEventListener("click", () => $("#how-to-dialog").close());
 $("#logout-button").addEventListener("click", async () => {
-  await api("/api/auth/logout", { method: "POST", body: "{}" });
+  try {
+    await api("/api/auth/logout", { method: "POST", body: "{}" });
+  } catch {
+  }
   state.developmentSession = null;
   storage.remove("gamdle-dev-session");
   location.reload();

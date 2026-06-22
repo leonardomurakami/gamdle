@@ -226,6 +226,13 @@ input::placeholder { color: var(--dim); opacity: 1; }
   text-transform: uppercase;
 }
 .move-track { display: flex; gap: 0.35rem; }
+.move-group {
+  display: flex;
+  gap: 0.35rem;
+}
+.move-group + .move-group {
+  margin-left: 0.65rem;
+}
 .move-dot {
   width: 2rem;
   height: 0.32rem;
@@ -236,40 +243,9 @@ input::placeholder { color: var(--dim); opacity: 1; }
 .move-dot.current { background: var(--accent); }
 .leave-button { color: var(--muted); }
 
-.game-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.45rem;
-  padding: 0.45rem;
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  background: oklch(0.105 0.015 150);
-}
-.game-tab {
-  min-height: 3.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.55rem;
-  border: 0;
-  border-radius: 8px;
-  color: var(--muted);
-  background: transparent;
-  font-weight: 800;
-  transition: color var(--transition), background var(--transition), transform var(--transition);
-}
-.game-tab span {
-  min-width: 1.7rem;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-}
-.game-tab:hover { color: var(--ink); background: var(--surface); }
-.game-tab.selected { color: var(--ink); background: var(--primary-soft); }
-.game-tab:active { transform: scale(0.985); }
-
 .play-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 330px;
+  grid-template-columns: 1fr;
   gap: 0.8rem;
   margin-top: 0.8rem;
   align-items: start;
@@ -514,9 +490,9 @@ input::placeholder { color: var(--dim); opacity: 1; }
 .dice-total strong { color: var(--accent); font-size: 2.5rem; font-variant-numeric: tabular-nums; }
 
 .slot-machine {
-  --slot-dark: oklch(0.42 0.02 250);
-  --slot-mid: oklch(0.68 0.025 250);
-  --slot-light: oklch(0.9 0.015 250);
+  --slot-dark: oklch(0.38 0.01 250);
+  --slot-mid: oklch(0.62 0.015 250);
+  --slot-light: oklch(0.88 0.01 250);
   width: min(500px, calc(100% - 2rem));
   border: 5px solid var(--slot-dark);
   border-radius: 16px;
@@ -525,12 +501,17 @@ input::placeholder { color: var(--dim); opacity: 1; }
   box-shadow: inset 0 0 0 2px oklch(1 0 0 / 0.36), 0 8px 8px oklch(0 0 0 / 0.4);
   transition: border-color var(--transition), background var(--transition);
 }
-.slot-machine.slot-swing {
+.slot-machine.slot-silver {
+  --slot-dark: oklch(0.38 0.01 250);
+  --slot-mid: oklch(0.62 0.015 250);
+  --slot-light: oklch(0.88 0.01 250);
+}
+.slot-machine.slot-gold {
   --slot-dark: oklch(0.43 0.11 75);
   --slot-mid: oklch(0.68 0.15 78);
   --slot-light: oklch(0.88 0.12 88);
 }
-.slot-machine.slot-jackpot {
+.slot-machine.slot-diamond {
   --slot-dark: oklch(0.43 0.13 235);
   --slot-mid: oklch(0.7 0.12 220);
   --slot-light: oklch(0.91 0.07 205);
@@ -538,7 +519,7 @@ input::placeholder { color: var(--dim); opacity: 1; }
 .slot-header { display: flex; justify-content: space-between; margin-bottom: 0.85rem; color: oklch(0.16 0.025 230); font-weight: 950; letter-spacing: 0.08em; }
 .reel-window {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 0.6rem;
   padding: 0.65rem;
   border-radius: 10px;
@@ -580,6 +561,34 @@ input::placeholder { color: var(--dim); opacity: 1; }
 .slot-lights { display: flex; justify-content: space-around; margin-top: 1rem; }
 .slot-lights i { width: 11px; height: 11px; border-radius: 50%; background: oklch(0.35 0.07 65); transition: background var(--transition), box-shadow var(--transition); }
 .slot-lights i.lit { background: var(--accent); box-shadow: 0 0 9px var(--accent); }
+
+.game-transition {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: oklch(0.06 0.01 150 / 0.95);
+}
+.transition-content {
+  text-align: center;
+}
+.transition-icon {
+  display: block;
+  margin-bottom: 1rem;
+  font-size: 3rem;
+  color: var(--accent);
+}
+.transition-title {
+  margin: 0;
+  font-size: 2.5rem;
+  letter-spacing: -0.03em;
+}
+.transition-subtitle {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
 
 .result-ribbon {
   display: flex;
@@ -723,10 +732,7 @@ input::placeholder { color: var(--dim); opacity: 1; }
   font-weight: 900;
   font-variant-numeric: tabular-nums;
 }
-.slot-profiles { grid-template-columns: repeat(3, 1fr); }
-.profile-button { min-height: 4.2rem; text-align: left; padding: 0.7rem; }
-.profile-button strong, .profile-button small { display: block; }
-.profile-button small { margin-top: 0.25rem; color: var(--dim); }
+
 .paytable { margin-top: 0.75rem; border-top: 1px solid var(--line); }
 .pay-row { display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; padding: 0.48rem 0; border-bottom: 1px solid var(--line); font-size: 0.78rem; }
 .pay-row span { color: var(--muted); }
@@ -916,7 +922,6 @@ dialog::backdrop { background: oklch(0.04 0 0 / 0.78); }
 
 @media (max-width: 1050px) {
   .scoreboard div:nth-child(2) { display: none; }
-  .play-layout { grid-template-columns: 1fr; }
   .choice-grid.numbers { grid-template-columns: repeat(8, 1fr); }
   .choice-grid.thresholds { grid-template-columns: repeat(6, 1fr); }
 }
@@ -926,8 +931,7 @@ dialog::backdrop { background: oklch(0.04 0 0 / 0.78); }
   .topbar { flex-wrap: wrap; padding: 0.8rem 0; }
   .scoreboard { order: 3; width: 100%; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 0.75rem; }
   .scoreboard div:nth-child(2) { display: flex; }
-  .game-tabs { grid-template-columns: 1fr 1fr; }
-  .play-layout { grid-template-columns: 1fr; }
+
   .bet-slip {
     position: sticky;
     z-index: 10;
@@ -975,7 +979,7 @@ dialog::backdrop { background: oklch(0.04 0 0 / 0.78); }
   .scoreboard strong { font-size: 1rem; }
   .session-bar { align-items: start; flex-direction: column; gap: 0.8rem; }
   .move-dot { width: 1.35rem; }
-  .game-tab { font-size: 0.78rem; }
+
   .arena-heading { padding: 0 0.9rem; }
   .game-stage, .stage-scene { min-height: 310px; }
   .roulette-wrap { width: 280px; }
@@ -983,7 +987,7 @@ dialog::backdrop { background: oklch(0.04 0 0 / 0.78); }
   .playing-card { width: 148px; height: 208px; }
   .dice-visual { width: min(100%, 360px); height: 190px; }
   .dice-pair { gap: 1rem; }
-  .slot-reel, .reel-strip span { height: 95px; }
+  .slot-reel, .reel-strip span { height: 80px; }
   .reel-strip span { font-size: 3rem; }
   .result-ribbon { align-items: start; flex-direction: column; }
   .result-actions { width: 100%; justify-content: space-between; }
@@ -1008,7 +1012,7 @@ dialog::backdrop { background: oklch(0.04 0 0 / 0.78); }
   .roulette-outside-grid .choice-button { min-height: 2.7rem; border-radius: 6px; }
   .choice-grid.dice-numbers { grid-template-columns: repeat(6, 1fr); }
   .choice-grid.thresholds { grid-template-columns: repeat(6, 1fr); }
-  .slot-profiles { grid-template-columns: 1fr; }
+
   .bet-slip { padding: 0.9rem; }
   .bet-slip.mobile-collapsed { padding: 0.7rem; }
   .bet-slip.mobile-collapsed .risk-label { display: none; }

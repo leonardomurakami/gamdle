@@ -6,6 +6,13 @@ process.env.DATABASE_PATH = ':memory:';
 
 const { server } = await import('../src/server.js');
 
+const validBets = {
+  wheel: { type: 'color', value: 'red' },
+  cards: { threshold: 7, direction: 'over' },
+  dice: { type: 'range', value: 'low' },
+  slots: { tier: 'silver' },
+};
+
 function listen() {
   return new Promise((resolve) => {
     server.listen(0, () => resolve(server.address()));
@@ -219,7 +226,7 @@ test('POST /api/game/play places a wager (table derived from game order)', async
   const playRes = await fetch(`${base}/api/game/play`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: cookie },
-    body: JSON.stringify({ stake: 10, bet: { type: 'color', value: 'red' } }),
+    body: JSON.stringify({ stake: 10, bet: validBets[firstTable] || { type: 'color', value: 'red' } }),
   });
   assert.equal(playRes.status, 200);
   const body = await playRes.json();
@@ -255,7 +262,7 @@ test('POST /api/game/anonymous/play resolves a wager with seed and gameOrder', a
       seed,
       gameOrder,
       stake: 50,
-      bet: { type: 'color', value: 'red' },
+      bet: validBets[firstTable] || { type: 'color', value: 'red' },
     }),
   });
   assert.equal(res.status, 200);

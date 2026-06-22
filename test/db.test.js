@@ -21,7 +21,7 @@ test('createDatabase with string path creates SQLite database', async () => {
 test('createDatabase with options object and no databaseUrl falls back to SQLite', async () => {
   const db = await createDatabase({ databasePath: ':memory:', databaseUrl: '' });
   const result = await db.get("SELECT value FROM app_meta WHERE key = 'gameplay_version'");
-  assert.equal(result.value, '2');
+  assert.equal(result.value, '3');
 });
 
 test('db.get returns null when no row matches', async () => {
@@ -83,10 +83,10 @@ test('transaction rolls back on error', async () => {
   assert.equal(user, null);
 });
 
-test('migration sets gameplay_version to 2', async () => {
+test('migration sets gameplay_version to 3', async () => {
   const db = await createDatabase(':memory:');
   const meta = await db.get("SELECT value FROM app_meta WHERE key = 'gameplay_version'");
-  assert.equal(meta.value, '2');
+  assert.equal(meta.value, '3');
 });
 
 test('migration clears stale gameplay data when version differs', async () => {
@@ -104,7 +104,7 @@ test('migration clears stale gameplay data when version differs', async () => {
   const runs = await db2.all('SELECT * FROM daily_runs');
   assert.equal(runs.length, 0);
   const meta = await db2.get("SELECT value FROM app_meta WHERE key = 'gameplay_version'");
-  assert.equal(meta.value, '2');
+  assert.equal(meta.value, '3');
 });
 
 test('foreign keys are enforced in SQLite', async () => {

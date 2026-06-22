@@ -176,10 +176,10 @@ input::placeholder { color: var(--dim); opacity: 1; }
 .game-shell {
   width: min(1440px, calc(100% - 2.5rem));
   margin: 0 auto;
-  padding-bottom: 5rem;
+  padding-bottom: 2rem;
 }
 .topbar {
-  min-height: 4.8rem;
+  min-height: 4rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -215,7 +215,7 @@ input::placeholder { color: var(--dim); opacity: 1; }
   align-items: center;
   justify-content: space-between;
   gap: 2rem;
-  padding: 1.3rem 0 1rem;
+  padding: 0.9rem 0 0.7rem;
 }
 .session-bar p {
   margin: 0 0 0.55rem;
@@ -245,7 +245,7 @@ input::placeholder { color: var(--dim); opacity: 1; }
 
 .play-layout {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr) 330px;
   gap: 0.8rem;
   margin-top: 0.8rem;
   align-items: start;
@@ -257,7 +257,7 @@ input::placeholder { color: var(--dim); opacity: 1; }
   overflow: hidden;
 }
 .arena-heading {
-  min-height: 4.8rem;
+  min-height: 3.8rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -279,7 +279,7 @@ input::placeholder { color: var(--dim); opacity: 1; }
 .arena-heading h1 { font-size: 1.65rem; }
 .game-stage {
   position: relative;
-  min-height: clamp(320px, 42vh, 390px);
+  min-height: clamp(260px, 36vh, 360px);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -301,7 +301,7 @@ input::placeholder { color: var(--dim); opacity: 1; }
   position: relative;
   z-index: 1;
   width: 100%;
-  min-height: clamp(320px, 42vh, 390px);
+  min-height: clamp(260px, 36vh, 360px);
   display: grid;
   place-items: center;
 }
@@ -616,7 +616,7 @@ input::placeholder { color: var(--dim); opacity: 1; }
   font-weight: 800;
 }
 
-.bet-surface { padding: 1.3rem; }
+.bet-surface { padding: 1rem 1.3rem; }
 .surface-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .surface-heading h2 { font-size: 1.2rem; }
 .surface-heading > span { color: var(--dim); font-size: 0.76rem; text-align: right; }
@@ -784,7 +784,7 @@ input::placeholder { color: var(--dim); opacity: 1; }
 .play-button { width: 100%; }
 .slip-note { margin: 0.75rem 0 0; color: var(--dim); font-size: 0.7rem; line-height: 1.45; }
 
-.history-section { margin-top: 3rem; }
+.history-section { margin-top: 1.5rem; }
 .section-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.8rem; }
 .section-heading h2, .achievement-section h2, .leaderboard-section h2 { margin: 0; letter-spacing: -0.025em; }
 .section-heading span { color: var(--dim); font-size: 0.8rem; }
@@ -922,6 +922,7 @@ dialog::backdrop { background: oklch(0.04 0 0 / 0.78); }
 
 @media (max-width: 1050px) {
   .scoreboard div:nth-child(2) { display: none; }
+  .play-layout { grid-template-columns: 1fr; }
   .choice-grid.numbers { grid-template-columns: repeat(8, 1fr); }
   .choice-grid.thresholds { grid-template-columns: repeat(6, 1fr); }
 }
@@ -931,6 +932,7 @@ dialog::backdrop { background: oklch(0.04 0 0 / 0.78); }
   .topbar { flex-wrap: wrap; padding: 0.8rem 0; }
   .scoreboard { order: 3; width: 100%; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 0.75rem; }
   .scoreboard div:nth-child(2) { display: flex; }
+  .play-layout { grid-template-columns: 1fr; }
 
   .bet-slip {
     position: sticky;

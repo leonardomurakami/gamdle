@@ -33,24 +33,20 @@ export function createCardReveal({ controller, sound }) {
     reset();
     populate(resolution);
     copy.textContent = 'Dealing today’s card…';
-    controller.begin(() => settle(resolution));
-    if (controller.reducedMotion()) {
-      controller.finish();
-      return;
-    }
-    sound.play('cards');
-    const control = controller.track(animate(
-      card,
-      {
-        y: [-42, -10, 0, 0],
-        rotateY: [0, 0, 104, 180],
-        rotateZ: [-3, -1, 0.7, 0],
-        scale: [0.96, 1.02, 1.01, 1],
-      },
-      { duration: 1.65, times: [0, 0.3, 0.68, 1], ease: [0.22, 1, 0.36, 1] },
-    ));
-    await controller.wait(control);
-    controller.finish();
+    await controller.playReveal(resolution, settle, async () => {
+      sound.play('cards');
+      const control = controller.track(animate(
+        card,
+        {
+          y: [-42, -10, 0, 0],
+          rotateY: [0, 0, 104, 180],
+          rotateZ: [-3, -1, 0.7, 0],
+          scale: [0.96, 1.02, 1.01, 1],
+        },
+        { duration: 1.65, times: [0, 0.3, 0.68, 1], ease: [0.22, 1, 0.36, 1] },
+      ));
+      await controller.wait(control);
+    });
   }
 
   return { reset, settle, play };

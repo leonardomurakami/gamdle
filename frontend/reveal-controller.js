@@ -66,7 +66,17 @@ export function createRevealController(skipButton) {
     }
   }
 
+  async function playReveal(resolution, settle, animate) {
+    begin(() => settle(resolution));
+    if (reducedMotion()) {
+      finish();
+      return;
+    }
+    await animate(resolution);
+    finish();
+  }
+
   skipButton.addEventListener('click', finish);
 
-  return { begin, track, finish, cancel, wait, reducedMotion };
+  return { begin, track, finish, cancel, wait, reducedMotion, playReveal };
 }

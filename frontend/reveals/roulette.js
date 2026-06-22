@@ -46,42 +46,37 @@ export function createRouletteReveal({ controller, sound }) {
 
   async function play(resolution) {
     reset();
-    controller.begin(() => settle(resolution));
-    if (controller.reducedMotion()) {
-      controller.finish();
-      return;
-    }
-
-    sound.play('wheel');
-    const trajectory = rouletteBallTrajectory(resolution.event.pocket);
-    const { landing, duration, times } = trajectory;
-    const wheelControl = controller.track(animate(
-      wheel,
-      { rotate: [0, landing.wheelRotation - 96, landing.wheelRotation - 22, landing.wheelRotation] },
-      { duration, times: [0, 0.68, 0.9, 1], ease: ['linear', 'easeOut', [0.16, 1, 0.3, 1]] },
-    ));
-    const orbitControl = controller.track(animate(
-      orbit,
-      { rotate: trajectory.orbit },
-      { duration, times, ease: 'linear' },
-    ));
-    const radiusControl = controller.track(animate(
-      radius,
-      { y: trajectory.radius },
-      { duration, times, ease: [0.4, 0, 0.2, 1] },
-    ));
-    const impactControl = controller.track(animate(
-      impact,
-      { x: trajectory.deflection, scale: trajectory.lift },
-      { duration, times, ease: 'easeInOut' },
-    ));
-    await Promise.all([
-      controller.wait(wheelControl),
-      controller.wait(orbitControl),
-      controller.wait(radiusControl),
-      controller.wait(impactControl),
-    ]);
-    controller.finish();
+    await controller.playReveal(resolution, settle, async () => {
+      sound.play('wheel');
+      const trajectory = rouletteBallTrajectory(resolution.event.pocket);
+      const { landing, duration, times } = trajectory;
+      const wheelControl = controller.track(animate(
+        wheel,
+        { rotate: [0, landing.wheelRotation - 96, landing.wheelRotation - 22, landing.wheelRotation] },
+        { duration, times: [0, 0.68, 0.9, 1], ease: ['linear', 'easeOut', [0.16, 1, 0.3, 1]] },
+      ));
+      const orbitControl = controller.track(animate(
+        orbit,
+        { rotate: trajectory.orbit },
+        { duration, times, ease: 'linear' },
+      ));
+      const radiusControl = controller.track(animate(
+        radius,
+        { y: trajectory.radius },
+        { duration, times, ease: [0.4, 0, 0.2, 1] },
+      ));
+      const impactControl = controller.track(animate(
+        impact,
+        { x: trajectory.deflection, scale: trajectory.lift },
+        { duration, times, ease: 'easeInOut' },
+      ));
+      await Promise.all([
+        controller.wait(wheelControl),
+        controller.wait(orbitControl),
+        controller.wait(radiusControl),
+        controller.wait(impactControl),
+      ]);
+    });
   }
 
   return { reset, settle, play };

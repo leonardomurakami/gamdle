@@ -46,36 +46,31 @@ export function createSlotsReveal({ controller, sound }) {
 
   async function play(resolution) {
     reset();
-    controller.begin(() => settle(resolution));
-    if (controller.reducedMotion()) {
-      controller.finish();
-      return;
-    }
-
-    const controls = reels.map((reel, index) => {
-      const strip = reel.querySelector('.reel-strip');
-      const landing = slotLanding(resolution.event.symbols[index], REEL_CYCLES);
-      const target = offsetFor(reel, landing.itemIndex);
-      const duration = 1.35 + index * 0.26;
-      const control = controller.track(animate(
-        strip,
-        {
-          y: [0, target + reel.clientHeight * 0.28, target - reel.clientHeight * 0.08, target],
-          filter: ['blur(0px)', 'blur(3px)', 'blur(1px)', 'blur(0px)'],
-        },
-        { duration, times: [0, 0.78, 0.92, 1], ease: ['linear', 'easeOut', [0.16, 1, 0.3, 1]] },
-      ));
-      control.then(() => {
-        if (reel.dataset.symbol !== landing.symbol) {
-          reel.dataset.symbol = landing.symbol;
-          sound.play('reel', false, index);
-          lights[index + 1]?.classList.add('lit');
-        }
-      }).catch(() => {});
-      return control;
+    await controller.playReveal(resolution, settle, async () => {
+      const controls = reels.map((reel, index) => {
+        const strip = reel.querySelector('.reel-strip');
+        const landing = slotLanding(resolution.event.symbols[index], REEL_CYCLES);
+        const target = offsetFor(reel, landing.itemIndex);
+        const duration = 1.35 + index * 0.26;
+        const control = controller.track(animate(
+          strip,
+          {
+            y: [0, target + reel.clientHeight * 0.28, target - reel.clientHeight * 0.08, target],
+            filter: ['blur(0px)', 'blur(3px)', 'blur(1px)', 'blur(0px)'],
+          },
+          { duration, times: [0, 0.78, 0.92, 1], ease: ['linear', 'easeOut', [0.16, 1, 0.3, 1]] },
+        ));
+        control.then(() => {
+          if (reel.dataset.symbol !== landing.symbol) {
+            reel.dataset.symbol = landing.symbol;
+            sound.play('reel', false, index);
+            lights[index + 1]?.classList.add('lit');
+          }
+        }).catch(() => {});
+        return control;
+      });
+      await Promise.all(controls.map(controller.wait));
     });
-    await Promise.all(controls.map(controller.wait));
-    controller.finish();
   }
 
   return { reset, settle, play };

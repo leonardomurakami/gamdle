@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#07100c">
     <meta name="description" content="A daily probability casino played with fictional points.">
     <title>Gamdle</title>
-    <link rel="stylesheet" href="/styles.css?v=5">
+    <link rel="stylesheet" href="/styles.css?v=6">
   </head>
   <body>
     <div class="ambient" aria-hidden="true"></div>
@@ -20,7 +20,8 @@
         <div class="scoreboard" aria-live="polite">
           <div><span>Bankroll</span><strong id="bankroll">1,000</strong></div>
           <div><span>Profit / loss</span><strong id="profit-loss">0</strong></div>
-          <div><span>Move</span><strong><b id="move">0</b> / 12</strong></div>
+          <div><span>Game</span><strong id="game-label">1 / 4</strong></div>
+          <div><span>Play</span><strong id="play-label">1 / 3</strong></div>
         </div>
         <div class="top-actions">
           <button id="sound-button" class="icon-text-button" type="button" aria-pressed="true">
@@ -38,13 +39,6 @@
           </div>
           <button id="leave-button" class="leave-button" type="button">Leave with current points</button>
         </div>
-
-        <nav id="game-tabs" class="game-tabs" aria-label="Casino games">
-          <button class="game-tab selected" data-table="wheel" type="button"><span>◉</span> Roulette</button>
-          <button class="game-tab" data-table="cards" type="button"><span>A♠</span> High Card</button>
-          <button class="game-tab" data-table="dice" type="button"><span>⚄</span> Dice Pool</button>
-          <button class="game-tab" data-table="slots" type="button"><span>7</span> Lucky Slots</button>
-        </nav>
 
         <div class="play-layout">
           <section class="game-arena" aria-labelledby="arena-title">
@@ -117,17 +111,27 @@
 
               <div id="slots-stage" class="stage-scene" hidden>
                 <div class="slot-machine">
-                  <div class="slot-header"><span>GAMDLE</span><strong id="slot-profile-label">STEADY</strong></div>
-                  <div class="reel-window" aria-label="Three slot reels">
+                  <div class="slot-header"><span>GAMDLE</span><strong id="slot-tier-label">SILVER</strong></div>
+                  <div class="reel-window" aria-label="Five slot reels">
                     <div id="reel-one" class="slot-reel" aria-label="Reel 1 ready"></div>
                     <div id="reel-two" class="slot-reel" aria-label="Reel 2 ready"></div>
                     <div id="reel-three" class="slot-reel" aria-label="Reel 3 ready"></div>
+                    <div id="reel-four" class="slot-reel" aria-label="Reel 4 ready"></div>
+                    <div id="reel-five" class="slot-reel" aria-label="Reel 5 ready"></div>
                   </div>
-                  <div class="slot-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+                  <div class="slot-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
                 </div>
               </div>
 
               <button id="skip-animation" class="skip-button" type="button" hidden>Skip reveal</button>
+
+              <div id="game-transition" class="game-transition" hidden>
+                <div class="transition-content">
+                  <span class="transition-icon" aria-hidden="true"></span>
+                  <h2 class="transition-title"></h2>
+                  <p class="transition-subtitle"></p>
+                </div>
+              </div>
             </div>
 
             <div id="result-ribbon" class="result-ribbon" role="status" hidden>
@@ -269,9 +273,9 @@
         <button id="how-to-close" class="icon-button" type="button" aria-label="Close game instructions">×</button>
       </div>
       <ol class="how-to-steps">
-        <li><strong>Start with 1,000 points.</strong><span>Choose a game, an outcome, and how much to risk.</span></li>
-        <li><strong>Play up to 12 moves.</strong><span>You can switch tables each move or leave with your current total.</span></li>
-        <li><strong>Everyone gets the same hidden outcomes.</strong><span>Today’s result for each table and move is fixed before anyone wagers.</span></li>
+        <li><strong>Start with 1,000 points.</strong><span>Four games are shuffled for you. Pick an outcome and how much to risk.</span></li>
+        <li><strong>3 plays per game, 4 games.</strong><span>Play through each game in order. The sequence is unique to you.</span></li>
+        <li><strong>Your outcomes are unique.</strong><span>Every player gets their own hidden casino landscape each day.</span></li>
         <li><strong>Share the route, not the wagers.</strong><span>Your result shows which tables you visited and each gain or loss, without revealing your choices.</span></li>
       </ol>
       <button id="how-to-start" class="play-button" type="button">Start playing</button>

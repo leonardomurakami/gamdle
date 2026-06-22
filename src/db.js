@@ -58,6 +58,8 @@ const sqliteSchema = `
     bankroll INTEGER NOT NULL DEFAULT 1000,
     move_number INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'active',
+    user_seed TEXT NOT NULL DEFAULT '',
+    game_order TEXT NOT NULL DEFAULT '[]',
     finished_at INTEGER,
     created_at INTEGER NOT NULL,
     UNIQUE (user_id, run_date),
@@ -154,6 +156,8 @@ const postgresSchema = `
     bankroll INTEGER NOT NULL DEFAULT 1000,
     move_number INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'active',
+    user_seed TEXT NOT NULL DEFAULT '',
+    game_order TEXT NOT NULL DEFAULT '[]',
     finished_at BIGINT,
     created_at BIGINT NOT NULL,
     UNIQUE (user_id, run_date)
@@ -289,12 +293,12 @@ class PostgresDatabase {
 async function migrate(db, schema) {
   await db.exec(schema);
   const gameplayVersion = await db.get("SELECT value FROM app_meta WHERE key = 'gameplay_version'");
-  if (gameplayVersion?.value !== '2') {
+  if (gameplayVersion?.value !== '3') {
     await db.exec(`
       DELETE FROM achievements;
       DELETE FROM wagers;
       DELETE FROM daily_runs;
-      INSERT INTO app_meta (key, value) VALUES ('gameplay_version', '2')
+      INSERT INTO app_meta (key, value) VALUES ('gameplay_version', '3')
       ON CONFLICT(key) DO UPDATE SET value = excluded.value;
     `);
   }

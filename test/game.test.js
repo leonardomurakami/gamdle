@@ -1,13 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  GAMES_PER_RUN,
+  PLAYS_PER_GAME,
   RTP,
   SLOT_PROFILES,
   achievementKeys,
   applyWager,
   eventFor,
   gameRules,
+  generateAnonymousSeed,
+  generateUserSeed,
   resolveWager,
+  shuffleGameOrder,
+  slotTierForPlay,
 } from '../src/game.js';
 
 test('daily events are deterministic and independent of wager choices', () => {
@@ -78,9 +84,41 @@ test('slot profiles total 100% probability and 96% RTP', () => {
 
 test('physical event remains unchanged when the wager changes', () => {
   const event = eventFor('secret', '2026-06-15', 9, 'slots');
-  const steady = resolveWager('slots', event, { profile: 'steady' });
-  const jackpot = resolveWager('slots', event, { profile: 'jackpot' });
+  const silver = resolveWager('slots', event, { tier: 'silver' });
+  const diamond = resolveWager('slots', event, { tier: 'diamond' });
   assert.equal(event.roll, eventFor('secret', '2026-06-15', 9, 'slots').roll);
-  assert.ok(Array.isArray(steady.symbols));
-  assert.ok(Array.isArray(jackpot.symbols));
+  assert.ok(Array.isArray(silver.symbols));
+  assert.ok(Array.isArray(diamond.symbols));
+  assert.equal(silver.symbols.length, 5);
+  assert.equal(diamond.symbols.length, 5);
+});
+
+test('generateUserSeed is deterministic for same inputs', () => {
+  const a = generateUserSeed('secret', 42, '2026-06-15');
+  const b = generateUserSeed('secret', 42, '2026-06-15');
+  assert.equal(a, b);
+  const c = generateUserSeed('secret', 43, '2026-06-15');
+  assert.notEqual(a, c);
+});
+
+test('generateAnonymousSeed is random each call', () => {
+  const a = generateAnonymousSeed();
+  const b = generateAnonymousSeed();
+  assert.notEqual(a, b);
+});
+
+test('shuffleGameOrder is deterministic and returns 4 tables', () => {
+  const order1 = shuffleGameOrder('seed1', '2026-06-15');
+  const order2 = shuffleGameOrder('seed1', '2026-06-15');
+  assert.deepEqual(order1, order2);
+  assert.equal(order1.length, GAMES_PER_RUN);
+  const sorted = [...order1].sort();
+  assert.deepEqual(sorted, ['cards', 'dice', 'slots', 'wheel']);
+});
+
+test('slotTierForPlay returns correct tiers', () => {
+  assert.equal(slotTierForPlay(0), 'silver');
+  assert.equal(slotTierForPlay(1), 'gold');
+  assert.equal(slotTierForPlay(2), 'diamond');
+  assert.equal(slotTierForPlay(5), 'diamond');
 });

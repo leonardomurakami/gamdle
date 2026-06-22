@@ -6,6 +6,13 @@ process.env.DATABASE_PATH = ':memory:';
 
 const { server } = await import('../src/server.js');
 
+const validBets = {
+  wheel: { type: 'color', value: 'red' },
+  cards: { threshold: 7, direction: 'over' },
+  dice: { type: 'range', value: 'low' },
+  slots: { tier: 'silver' },
+};
+
 function listen() {
   return new Promise((resolve) => {
     server.listen(0, () => resolve(server.address()));
@@ -65,7 +72,7 @@ test('GET /api/game returns 401 when unauthenticated', async () => {
   assert.ok(body.error);
 });
 
-test('GET /api/game/anonymous returns anonymous run payload', async () => {
+test('GET /api/game/anonymous returns anonymous run payload with seed and gameOrder', async () => {
   const res = await fetch(`${base}/api/game/anonymous`);
   assert.equal(res.status, 200);
   const body = await res.json();
@@ -75,6 +82,10 @@ test('GET /api/game/anonymous returns anonymous run payload', async () => {
   assert.equal(body.run.movesRemaining, 12);
   assert.equal(body.run.status, 'active');
   assert.deepEqual(body.run.wagers, []);
+  assert.ok(body.run.seed);
+  assert.ok(Array.isArray(body.run.gameOrder));
+  assert.equal(body.run.gameOrder.length, 4);
+  assert.ok(body.run.currentGame);
   assert.ok(body.rules);
   assert.ok(body.rules.games.wheel);
   assert.ok(body.rules.games.cards);
@@ -174,7 +185,7 @@ test('auth verify with invalid token redirects to /?auth=invalid', async () => {
   assert.ok(res.headers.get('location').includes('auth=invalid'));
 });
 
-test('GET /api/game returns run for authenticated user', async () => {
+test('GET /api/game returns run with gameOrder for authenticated user', async () => {
   const email = `game-${Date.now()}@example.com`;
   const reqRes = await fetch(`${base}/api/auth/request`, {
     method: 'POST',
@@ -191,10 +202,13 @@ test('GET /api/game returns run for authenticated user', async () => {
   assert.equal(body.user.email, email);
   assert.equal(body.run.bankroll, 1000);
   assert.equal(body.run.status, 'active');
+  assert.ok(Array.isArray(body.run.gameOrder));
+  assert.equal(body.run.gameOrder.length, 4);
+  assert.ok(body.run.currentGame);
   assert.ok(body.rules);
 });
 
-test('POST /api/game/play places a wager for authenticated user', async () => {
+test('POST /api/game/play places a wager (table derived from game order)', async () => {
   const email = `play-${Date.now()}@example.com`;
   const reqRes = await fetch(`${base}/api/auth/request`, {
     method: 'POST',
@@ -205,16 +219,21 @@ test('POST /api/game/play places a wager for authenticated user', async () => {
   const verifyRes = await fetch(localizeLink(developmentLink), { redirect: 'manual' });
   const cookie = verifyRes.headers.get('set-cookie').split(';')[0];
 
+  const gameRes = await fetch(`${base}/api/game`, { headers: { Cookie: cookie } });
+  const gameBody = await gameRes.json();
+  const firstTable = gameBody.run.gameOrder[0];
+
   const playRes = await fetch(`${base}/api/game/play`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: cookie },
-    body: JSON.stringify({ table: 'wheel', stake: 10, bet: { type: 'color', value: 'red' } }),
+    body: JSON.stringify({ stake: 10, bet: validBets[firstTable] || { type: 'color', value: 'red' } }),
   });
   assert.equal(playRes.status, 200);
   const body = await playRes.json();
   assert.ok(body.run);
   assert.equal(body.run.move, 1);
   assert.equal(body.run.wagers.length, 1);
+  assert.equal(body.run.wagers[0].table, firstTable);
   assert.ok(body.resolution);
 });
 
@@ -222,32 +241,38 @@ test('POST /api/game/play returns 401 when unauthenticated', async () => {
   const res = await fetch(`${base}/api/game/play`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ table: 'wheel', stake: 10, bet: { type: 'color', value: 'red' } }),
+    body: JSON.stringify({ stake: 10, bet: { type: 'color', value: 'red' } }),
   });
   assert.equal(res.status, 401);
 });
 
-test('POST /api/game/anonymous/play resolves a wager', async () => {
-  const today = new Date().toISOString().slice(0, 10);
+test('POST /api/game/anonymous/play resolves a wager with seed and gameOrder', async () => {
+  const anonRes = await fetch(`${base}/api/game/anonymous`);
+  const anonBody = await anonRes.json();
+  const { seed, gameOrder, date } = anonBody.run;
+  const firstTable = gameOrder[0];
+
   const res = await fetch(`${base}/api/game/anonymous/play`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      date: today,
+      date,
       move: 0,
       bankroll: 1000,
-      table: 'wheel',
+      seed,
+      gameOrder,
       stake: 50,
-      bet: { type: 'color', value: 'red' },
+      bet: validBets[firstTable] || { type: 'color', value: 'red' },
     }),
   });
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.wager.move, 1);
-  assert.equal(body.wager.table, 'wheel');
+  assert.equal(body.wager.table, firstTable);
   assert.equal(body.wager.stake, 50);
   assert.ok(typeof body.wager.won === 'boolean');
   assert.ok(body.resolution);
+  assert.ok(body.currentGame);
 });
 
 test('POST /api/game/anonymous/play rejects wrong date', async () => {
@@ -258,7 +283,8 @@ test('POST /api/game/anonymous/play rejects wrong date', async () => {
       date: '1999-01-01',
       move: 0,
       bankroll: 1000,
-      table: 'wheel',
+      seed: 'abc',
+      gameOrder: ['wheel', 'cards', 'dice', 'slots'],
       stake: 50,
       bet: { type: 'color', value: 'red' },
     }),
@@ -277,7 +303,8 @@ test('POST /api/game/anonymous/play rejects invalid move number', async () => {
       date: today,
       move: 12,
       bankroll: 1000,
-      table: 'wheel',
+      seed: 'abc',
+      gameOrder: ['wheel', 'cards', 'dice', 'slots'],
       stake: 50,
       bet: { type: 'color', value: 'red' },
     }),
@@ -357,7 +384,7 @@ test('POST /api/game/play rejects play on a finished run', async () => {
   const playRes = await fetch(`${base}/api/game/play`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: cookie },
-    body: JSON.stringify({ table: 'wheel', stake: 10, bet: { type: 'color', value: 'red' } }),
+    body: JSON.stringify({ stake: 10, bet: { type: 'color', value: 'red' } }),
   });
   assert.equal(playRes.status, 409);
   const body = await playRes.json();

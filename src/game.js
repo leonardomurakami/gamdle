@@ -8,43 +8,46 @@ export class GameError extends Error {
   }
 }
 
-export const RULES_VERSION = 2;
+export const RULES_VERSION = 3;
 export const STARTING_BANKROLL = 1000;
-export const MAX_MOVES = 12;
+export const GAMES_PER_RUN = 4;
+export const PLAYS_PER_GAME = 3;
+export const MAX_MOVES = GAMES_PER_RUN * PLAYS_PER_GAME;
 export const RTP = 0.96;
 export const HOUSE_EDGE = 0.04;
 export const TABLES = ['wheel', 'cards', 'dice', 'slots'];
+export const SLOT_TIERS = ['silver', 'gold', 'diamond'];
 
 const RANK_NAMES = {
   1: 'Ace', 11: 'Jack', 12: 'Queen', 13: 'King',
 };
 
 export const SLOT_PROFILES = {
-  steady: {
-    name: 'Steady',
+  silver: {
+    name: 'Silver',
     outcomes: [
-      { key: 'miss', probability: 0.28, multiplier: 0, symbols: ['lemon', 'seven', 'gem'] },
-      { key: 'pair', probability: 0.50, multiplier: 1.2, symbols: ['cherry', 'cherry', 'lemon'] },
-      { key: 'triple', probability: 0.20, multiplier: 1.5, symbols: ['lemon', 'lemon', 'lemon'] },
-      { key: 'bonus', probability: 0.02, multiplier: 3, symbols: ['gem', 'gem', 'gem'] },
+      { key: 'miss', probability: 0.28, multiplier: 0, symbols: ['lemon', 'seven', 'gem', 'cherry', 'lemon'] },
+      { key: 'pair', probability: 0.50, multiplier: 1.2, symbols: ['cherry', 'cherry', 'lemon', 'gem', 'seven'] },
+      { key: 'triple', probability: 0.20, multiplier: 1.5, symbols: ['lemon', 'lemon', 'lemon', 'cherry', 'gem'] },
+      { key: 'bonus', probability: 0.02, multiplier: 3, symbols: ['gem', 'gem', 'gem', 'gem', 'gem'] },
     ],
   },
-  swing: {
-    name: 'Swing',
+  gold: {
+    name: 'Gold',
     outcomes: [
-      { key: 'miss', probability: 0.66, multiplier: 0, symbols: ['cherry', 'gem', 'seven'] },
-      { key: 'pair', probability: 0.25, multiplier: 2, symbols: ['lemon', 'lemon', 'cherry'] },
-      { key: 'triple', probability: 0.08, multiplier: 4, symbols: ['cherry', 'cherry', 'cherry'] },
-      { key: 'bonus', probability: 0.01, multiplier: 14, symbols: ['seven', 'seven', 'seven'] },
+      { key: 'miss', probability: 0.66, multiplier: 0, symbols: ['cherry', 'gem', 'seven', 'lemon', 'cherry'] },
+      { key: 'pair', probability: 0.25, multiplier: 2, symbols: ['lemon', 'lemon', 'cherry', 'seven', 'gem'] },
+      { key: 'triple', probability: 0.08, multiplier: 4, symbols: ['cherry', 'cherry', 'cherry', 'lemon', 'cherry'] },
+      { key: 'bonus', probability: 0.01, multiplier: 14, symbols: ['seven', 'seven', 'seven', 'seven', 'seven'] },
     ],
   },
-  jackpot: {
-    name: 'Jackpot',
+  diamond: {
+    name: 'Diamond',
     outcomes: [
-      { key: 'miss', probability: 0.885, multiplier: 0, symbols: ['lemon', 'cherry', 'gem'] },
-      { key: 'pair', probability: 0.07, multiplier: 2, symbols: ['cherry', 'cherry', 'seven'] },
-      { key: 'triple', probability: 0.04, multiplier: 8, symbols: ['gem', 'gem', 'gem'] },
-      { key: 'bonus', probability: 0.005, multiplier: 100, symbols: ['seven', 'seven', 'seven'] },
+      { key: 'miss', probability: 0.885, multiplier: 0, symbols: ['lemon', 'cherry', 'gem', 'seven', 'lemon'] },
+      { key: 'pair', probability: 0.07, multiplier: 2, symbols: ['cherry', 'cherry', 'seven', 'lemon', 'gem'] },
+      { key: 'triple', probability: 0.04, multiplier: 8, symbols: ['gem', 'gem', 'gem', 'cherry', 'gem'] },
+      { key: 'bonus', probability: 0.005, multiplier: 100, symbols: ['seven', 'seven', 'seven', 'seven', 'seven'] },
     ],
   },
 };
@@ -58,17 +61,58 @@ export const ACHIEVEMENTS = {
   last_minute_miracle: { name: 'Last-Minute Miracle', description: 'The largest win arrived on move 12.' },
 };
 
-function deterministicBytes(secret, date, move, table) {
+export function generateUserSeed(secret, userId, date) {
   return crypto.createHmac('sha256', secret)
+    .update(`${userId}|${date}`)
+    .digest('hex');
+}
+
+export function generateAnonymousSeed() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+export function shuffleGameOrder(seed, date) {
+  const bytes = crypto.createHmac('sha256', seed)
+    .update(`order|${date}`)
+    .digest();
+  const tables = [...TABLES];
+  for (let i = tables.length - 1; i > 0; i--) {
+    const j = bytes.readUInt32BE((tables.length - 1 - i) * 4) % (i + 1);
+    [tables[i], tables[j]] = [tables[j], tables[i]];
+  }
+  return tables;
+}
+
+export function currentGameInfo(moveNumber, gameOrder) {
+  const gameIndex = Math.min(Math.floor(moveNumber / PLAYS_PER_GAME), GAMES_PER_RUN - 1);
+  const playIndex = moveNumber % PLAYS_PER_GAME;
+  const table = gameOrder[gameIndex];
+  return { gameIndex, playIndex, table, gamesCompleted: gameIndex };
+}
+
+export function nextMoveInfo(moveNumber, gameOrder) {
+  if (moveNumber >= MAX_MOVES) return null;
+  const gameIndex = Math.floor(moveNumber / PLAYS_PER_GAME);
+  const playIndex = moveNumber % PLAYS_PER_GAME;
+  const table = gameOrder[gameIndex];
+  return { gameIndex, playIndex, table };
+}
+
+export function slotTierForPlay(playIndex) {
+  return SLOT_TIERS[Math.min(playIndex, SLOT_TIERS.length - 1)];
+}
+
+function deterministicBytes(seed, date, move, table) {
+  return crypto.createHmac('sha256', seed)
     .update(`${date}|${move}|${table}`)
     .digest();
 }
 
-export function eventFor(secret, date, move, table) {
+export function eventFor(seed, date, move, table) {
   if (!TABLES.includes(table) || move < 1 || move > MAX_MOVES) {
     throw new GameError('Invalid table or move.');
   }
-  const bytes = deterministicBytes(secret, date, move, table);
+  const bytes = deterministicBytes(seed, date, move, table);
   const primary = bytes.readUInt32BE(0);
   if (table === 'wheel') return { pocket: primary % 37 };
   if (table === 'cards') {
@@ -152,8 +196,9 @@ function slotOutcome(profile, roll) {
 }
 
 function slotsResolution(event, bet) {
-  const profile = SLOT_PROFILES[bet.profile];
-  if (!profile) throw new GameError('Invalid slot volatility.');
+  const tier = bet.tier || 'silver';
+  const profile = SLOT_PROFILES[tier];
+  if (!profile) throw new GameError('Invalid slot tier.');
   const outcome = slotOutcome(profile, event.roll);
   return {
     won: outcome.multiplier > 0,
@@ -162,7 +207,7 @@ function slotsResolution(event, bet) {
     label: outcome.multiplier > 0 ? `${profile.name} paid ${outcome.multiplier}×` : `${profile.name} missed`,
     risk: riskLabel(outcome.probability),
     symbols: outcome.symbols,
-    tier: outcome.key,
+    tier,
   };
 }
 
@@ -210,6 +255,8 @@ export function gameRules() {
     rtp: RTP,
     houseEdge: HOUSE_EDGE,
     maxMoves: MAX_MOVES,
+    gamesPerRun: GAMES_PER_RUN,
+    playsPerGame: PLAYS_PER_GAME,
     startingBankroll: STARTING_BANKROLL,
     games: {
       wheel: {
@@ -257,7 +304,7 @@ export function gameRules() {
       },
       slots: {
         name: 'Lucky Slots',
-        profiles: Object.entries(SLOT_PROFILES).map(([key, profile]) => ({
+        tiers: Object.entries(SLOT_PROFILES).map(([key, profile]) => ({
           key,
           name: profile.name,
           outcomes: profile.outcomes,

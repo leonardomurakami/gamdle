@@ -16,14 +16,22 @@ import {
 } from './auth.js';
 import {
   ACHIEVEMENTS,
+  GAMES_PER_RUN,
   GameError,
   MAX_MOVES,
+  PLAYS_PER_GAME,
   STARTING_BANKROLL,
   achievementKeys,
   applyWager,
+  currentGameInfo,
   eventFor,
   gameRules,
+  generateAnonymousSeed,
+  generateUserSeed,
+  nextMoveInfo,
   resolveWager,
+  shuffleGameOrder,
+  slotTierForPlay,
   utcDate,
 } from './game.js';
 
@@ -143,12 +151,14 @@ async function getOrCreateRun(userId) {
   const date = utcDate();
   const existing = await db.get('SELECT * FROM daily_runs WHERE user_id = ? AND run_date = ?', userId, date);
   if (existing) return existing;
+  const userSeed = generateUserSeed(config.dailySeedSecret, userId, date);
+  const gameOrder = shuffleGameOrder(userSeed, date);
   const now = Date.now();
   const result = await db.run(`
-    INSERT INTO daily_runs (user_id, run_date, bankroll, move_number, status, created_at)
-    VALUES (?, ?, ?, 0, 'active', ?)
+    INSERT INTO daily_runs (user_id, run_date, bankroll, move_number, status, user_seed, game_order, created_at)
+    VALUES (?, ?, ?, 0, 'active', ?, ?, ?)
     RETURNING id
-  `, userId, date, STARTING_BANKROLL, now);
+  `, userId, date, STARTING_BANKROLL, userSeed, JSON.stringify(gameOrder), now);
   const run = await db.get('SELECT * FROM daily_runs WHERE id = ?', result.lastInsertRowid);
   if (!run) throw new Error('Failed to create daily run.');
   return run;
@@ -187,12 +197,16 @@ async function runPayload(run, userId) {
   const wagers = await db.all('SELECT * FROM wagers WHERE run_id = ? ORDER BY move_number', run.id);
   const unlocked = await db.all('SELECT achievement_key, first_date FROM achievements WHERE user_id = ? ORDER BY unlocked_at', userId);
   const finished = run.status !== 'active';
+  const gameOrder = JSON.parse(run.game_order || '[]');
+  const gameInfo = currentGameInfo(run.move_number, gameOrder);
   const payload = {
     date: run.run_date,
     bankroll: run.bankroll,
     move: run.move_number,
     movesRemaining: MAX_MOVES - run.move_number,
     status: run.status,
+    gameOrder,
+    currentGame: gameInfo,
     wagers: wagers.map(serializeWager),
     achievements: unlocked.map((row) => ({ key: row.achievement_key, ...ACHIEVEMENTS[row.achievement_key], firstDate: row.first_date })),
   };
@@ -224,12 +238,18 @@ async function leaderboardPayload(run) {
 }
 
 function anonymousRun(date = utcDate()) {
+  const seed = generateAnonymousSeed();
+  const gameOrder = shuffleGameOrder(seed, date);
+  const gameInfo = currentGameInfo(0, gameOrder);
   return {
     date,
+    seed,
     bankroll: STARTING_BANKROLL,
     move: 0,
     movesRemaining: MAX_MOVES,
     status: 'active',
+    gameOrder,
+    currentGame: gameInfo,
     wagers: [],
     achievements: [],
   };
@@ -315,17 +335,26 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === 'POST' && url.pathname === '/api/game/anonymous/play') {
-    const { date, move, bankroll, table, stake, bet } = await readJson(req);
+    const { date, move, bankroll, seed, gameOrder, stake, bet } = await readJson(req);
     if (date !== utcDate()) return json(res, 400, { error: 'Anonymous runs expire when the daily casino changes.' });
     const nextMove = Number(move) + 1;
     if (!Number.isInteger(nextMove) || nextMove < 1 || nextMove > MAX_MOVES) {
       return json(res, 400, { error: 'Invalid move number.' });
     }
+    if (!seed || !Array.isArray(gameOrder) || gameOrder.length !== GAMES_PER_RUN) {
+      return json(res, 400, { error: 'Invalid game state.' });
+    }
     try {
-      const event = eventFor(config.dailySeedSecret, date, nextMove, table);
-      const resolution = resolveWager(table, event, bet || {});
+      const moveInfo = nextMoveInfo(nextMove - 1, gameOrder);
+      const table = moveInfo.table;
+      const slotBet = table === 'slots'
+        ? { tier: slotTierForPlay(moveInfo.playIndex) }
+        : (bet || {});
+      const event = eventFor(seed, date, nextMove, table);
+      const resolution = resolveWager(table, event, table === 'slots' ? slotBet : (bet || {}));
       const applied = applyWager(Number(bankroll), Number(stake), resolution);
       const status = applied.bankroll === 0 ? 'broke' : nextMove === MAX_MOVES ? 'complete' : 'active';
+      const nextGameInfo = status === 'active' ? currentGameInfo(nextMove, gameOrder) : null;
       return json(res, 200, {
         wager: {
           move: nextMove,
@@ -339,6 +368,7 @@ async function handleApi(req, res, url) {
           resultLabel: resolution.label,
         },
         status,
+        currentGame: nextGameInfo,
         ...(status !== 'active' ? { results: await anonymousResults(date, applied.bankroll) } : {}),
         resolution: {
           ...resolution,
@@ -366,14 +396,20 @@ async function handleApi(req, res, url) {
   if (req.method === 'POST' && url.pathname === '/api/game/play') {
     const user = await requireUser(req, res);
     if (!user) return;
-    const { table, stake, bet } = await readJson(req);
+    const { stake, bet } = await readJson(req);
     const run = await getOrCreateRun(user.id);
     if (run.status !== 'active') return json(res, 409, { error: 'Today’s run has already ended.' });
 
     try {
       const nextMove = run.move_number + 1;
-      const event = eventFor(config.dailySeedSecret, run.run_date, nextMove, table);
-      const resolution = resolveWager(table, event, bet || {});
+      const gameOrder = JSON.parse(run.game_order || '[]');
+      const moveInfo = nextMoveInfo(run.move_number, gameOrder);
+      const table = moveInfo.table;
+      const slotBet = table === 'slots'
+        ? { tier: slotTierForPlay(moveInfo.playIndex) }
+        : (bet || {});
+      const event = eventFor(run.user_seed, run.run_date, nextMove, table);
+      const resolution = resolveWager(table, event, table === 'slots' ? slotBet : (bet || {}));
       const applied = applyWager(run.bankroll, Number(stake), resolution);
       const status = applied.bankroll === 0 ? 'broke' : nextMove === MAX_MOVES ? 'complete' : 'active';
       const now = Date.now();

@@ -226,19 +226,19 @@ test('wheel exact rejects out-of-range number', () => {
 
 // --- Slots resolution ---
 
-test('slots resolution rejects invalid profile', () => {
-  assert.throws(() => resolveWager('slots', { roll: 100 }, { profile: 'mega' }));
+test('slots resolution rejects invalid tier', () => {
+  assert.throws(() => resolveWager('slots', { roll: 100 }, { tier: 'mega' }));
 });
 
-test('slots steady profile always returns symbols array', () => {
-  const resolution = resolveWager('slots', { roll: 0 }, { profile: 'steady' });
+test('slots silver tier always returns 5-symbol array', () => {
+  const resolution = resolveWager('slots', { roll: 0 }, { tier: 'silver' });
   assert.ok(Array.isArray(resolution.symbols));
-  assert.equal(resolution.symbols.length, 3);
+  assert.equal(resolution.symbols.length, 5);
 });
 
 test('slots resolution includes tier field', () => {
-  const resolution = resolveWager('slots', { roll: 0 }, { profile: 'steady' });
-  assert.ok(['miss', 'pair', 'triple', 'bonus'].includes(resolution.tier));
+  const resolution = resolveWager('slots', { roll: 0 }, { tier: 'silver' });
+  assert.equal(resolution.tier, 'silver');
 });
 
 // --- resolveWager unknown table ---
@@ -421,16 +421,18 @@ test('no achievements on empty wager list', () => {
 
 test('gameRules returns expected structure', () => {
   const rules = gameRules();
-  assert.equal(rules.version, 2);
+  assert.equal(rules.version, 3);
   assert.equal(rules.rtp, RTP);
   assert.equal(rules.maxMoves, MAX_MOVES);
+  assert.equal(rules.gamesPerRun, 4);
+  assert.equal(rules.playsPerGame, 3);
   assert.equal(rules.startingBankroll, STARTING_BANKROLL);
   assert.ok(rules.games.wheel.outsideBets.length === 4);
   assert.ok(rules.games.wheel.exactBets.length === 37);
   assert.ok(rules.games.cards.bets.length > 0);
   assert.ok(rules.games.dice.rangeBets.length === 3);
   assert.ok(rules.games.dice.exactBets.length === 11);
-  assert.ok(rules.games.slots.profiles.length === 3);
+  assert.ok(rules.games.slots.tiers.length === 3);
 });
 
 test('gameRules card bets include both over and under', () => {
@@ -441,12 +443,12 @@ test('gameRules card bets include both over and under', () => {
   assert.ok(underBets.length > 0);
 });
 
-test('gameRules slots profiles include win probability and max multiplier', () => {
+test('gameRules slots tiers include win probability and max multiplier', () => {
   const rules = gameRules();
-  for (const profile of rules.games.slots.profiles) {
-    assert.ok(profile.winProbability > 0 && profile.winProbability < 1);
-    assert.ok(profile.maxMultiplier > 0);
-    assert.ok(profile.risk);
+  for (const tier of rules.games.slots.tiers) {
+    assert.ok(tier.winProbability > 0 && tier.winProbability < 1);
+    assert.ok(tier.maxMultiplier > 0);
+    assert.ok(tier.risk);
   }
 });
 

@@ -51,7 +51,7 @@ export function createSlotsReveal({ controller, sound }) {
         const strip = reel.querySelector('.reel-strip');
         const landing = slotLanding(resolution.event.symbols[index], REEL_CYCLES);
         const target = offsetFor(reel, landing.itemIndex);
-        const duration = 1.35 + index * 0.26;
+        const duration = 1.2 + index * 0.18;
         const control = controller.track(animate(
           strip,
           {

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { RED_NUMBERS } from './roulette-colors.js';
 
 export const RULES_VERSION = 2;
 export const STARTING_BANKROLL = 1000;
@@ -87,8 +88,7 @@ function binaryResolution(won, probability, label) {
 }
 
 function wheelResolution(event, bet) {
-  const red = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
-  const color = event.pocket === 0 ? 'green' : red.has(event.pocket) ? 'red' : 'black';
+  const color = event.pocket === 0 ? 'green' : RED_NUMBERS.has(event.pocket) ? 'red' : 'black';
   if (bet.type === 'color' && ['red', 'black'].includes(bet.value)) {
     return binaryResolution(color === bet.value, 18 / 37, `Pocket ${event.pocket}, ${color}`);
   }

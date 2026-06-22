@@ -55,6 +55,9 @@ const percent = (value) => {
   return `${scaled.toFixed(Number.isInteger(scaled) ? 0 : 1)}%`;
 };
 const multiplier = (value) => `${value.toFixed(value < 10 ? 2 : 1)}×`;
+const signedFormat = (value) => `${value >= 0 ? '+' : ''}${format(value)}`;
+const changeClass = (value) => value >= 0 ? 'positive' : 'negative';
+const pluralize = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
 const ordinal = (number) => {
   const suffix = number % 10 === 1 && number % 100 !== 11 ? 'st'
     : number % 10 === 2 && number % 100 !== 12 ? 'nd'
@@ -117,12 +120,7 @@ function setPhase(phase) {
   $('#repeat-button').disabled = locked || state.run?.status !== 'active';
 }
 
-function defaultSelection(table) {
-  const rules = state.rules.games[table];
-  if (table === 'wheel') return rules.outsideBets[0];
-  if (table === 'cards') return rules.bets.find((bet) => bet.key === 'cards-over-7');
-  if (table === 'dice') return rules.rangeBets[0];
-  const profile = rules.profiles[0];
+function slotSelection(profile) {
   return {
     key: `slots-${profile.key}`,
     label: profile.name,
@@ -133,6 +131,14 @@ function defaultSelection(table) {
     profile,
     variableReturn: true,
   };
+}
+
+function defaultSelection(table) {
+  const rules = state.rules.games[table];
+  if (table === 'wheel') return rules.outsideBets[0];
+  if (table === 'cards') return rules.bets.find((bet) => bet.key === 'cards-over-7');
+  if (table === 'dice') return rules.rangeBets[0];
+  return slotSelection(rules.profiles[0]);
 }
 
 function setSelection(selection) {
@@ -277,7 +283,7 @@ function renderMoveTrack() {
 function renderHistory() {
   const history = $('#history');
   const wagers = state.run.wagers;
-  $('#history-count').textContent = wagers.length ? `${wagers.length} move${wagers.length === 1 ? '' : 's'} played` : 'No moves yet';
+  $('#history-count').textContent = wagers.length ? `${pluralize(wagers.length, 'move')} played` : 'No moves yet';
   if (!wagers.length) {
     history.innerHTML = '<p class="empty-state">Your first result will appear here. Every table is waiting.</p>';
     return;
@@ -290,7 +296,7 @@ function renderHistory() {
         <small>${wager.resultLabel}</small>
       </span>
       <span class="history-stake">${format(wager.stake)} staked</span>
-      <span class="history-change ${wager.netChange >= 0 ? 'positive' : 'negative'}">${wager.netChange >= 0 ? '+' : ''}${format(wager.netChange)}</span>
+      <span class="history-change ${changeClass(wager.netChange)}">${signedFormat(wager.netChange)}</span>
     </div>
   `).join('');
 }
@@ -312,13 +318,13 @@ function renderResults() {
   $('#broke-percent').textContent = `${results.brokePercent}%`;
   $('#share-score').textContent = `${format(state.run.bankroll)} points`;
   $('#share-usage').textContent = state.run.wagers.length
-    ? `${state.run.wagers.length} move${state.run.wagers.length === 1 ? '' : 's'} · wager details hidden`
+    ? `${pluralize(state.run.wagers.length, 'move')} · wager details hidden`
     : 'Stopped before placing a wager';
   $('#share-route').innerHTML = state.run.wagers.map((wager) => `
     <div class="share-route-row">
       <span>${String(wager.move).padStart(2, '0')}</span>
       <strong>${tableNames[wager.table]}</strong>
-      <b class="${wager.netChange >= 0 ? 'positive' : 'negative'}">${wager.netChange >= 0 ? '+' : ''}${format(wager.netChange)}</b>
+      <b class="${changeClass(wager.netChange)}">${signedFormat(wager.netChange)}</b>
     </div>
   `).join('');
   $('#achievements').innerHTML = state.run.achievements.length
@@ -328,7 +334,7 @@ function renderResults() {
     <div class="leader-row">
       <span>${index + 1}</span>
       <strong>${format(row.bankroll)} points</strong>
-      <small>${row.players} player${row.players === 1 ? '' : 's'}</small>
+      <small>${pluralize(row.players, 'player')}</small>
     </div>`).join('');
 }
 
@@ -336,8 +342,8 @@ function renderRun() {
   $('#bankroll').textContent = format(state.run.bankroll);
   $('#move').textContent = state.run.move;
   const profitLoss = state.run.bankroll - state.rules.startingBankroll;
-  $('#profit-loss').textContent = `${profitLoss >= 0 ? '+' : ''}${format(profitLoss)}`;
-  $('#profit-loss').className = profitLoss >= 0 ? 'positive' : 'negative';
+  $('#profit-loss').textContent = signedFormat(profitLoss);
+  $('#profit-loss').className = changeClass(profitLoss);
   $('#stake').max = state.run.bankroll;
   if (Number($('#stake').value) > state.run.bankroll) $('#stake').value = state.run.bankroll;
   $('#date-label').textContent = new Date(`${state.run.date}T12:00:00Z`).toLocaleDateString(undefined, {
@@ -356,8 +362,8 @@ function showResolution(resolution) {
   $('#result-kicker').textContent = `Move ${state.run.move} resolved`;
   $('#result-title').textContent = resolution.won ? 'Wager won' : 'Wager lost';
   $('#result-detail').textContent = `${resolution.label}. Bankroll: ${format(resolution.bankroll)} points.`;
-  $('#result-change').textContent = `${resolution.netChange >= 0 ? '+' : ''}${format(resolution.netChange)}`;
-  $('#result-change').className = resolution.netChange >= 0 ? 'positive' : 'negative';
+  $('#result-change').textContent = signedFormat(resolution.netChange);
+  $('#result-change').className = changeClass(resolution.netChange);
   $('#repeat-button').hidden = state.run.status !== 'active';
   sound.play('result', resolution.won);
 }
@@ -524,16 +530,7 @@ $('#bet-controls').addEventListener('click', (event) => {
   }
   if (button.dataset.profile) {
     const profile = state.rules.games.slots.profiles.find((item) => item.key === button.dataset.profile);
-    state.selection = {
-      key: `slots-${profile.key}`,
-      label: profile.name,
-      probability: profile.winProbability,
-      multiplier: profile.maxMultiplier,
-      risk: profile.risk,
-      bet: { profile: profile.key },
-      profile,
-      variableReturn: true,
-    };
+    state.selection = slotSelection(profile);
     $('#slot-profile-label').textContent = profile.name.toUpperCase();
     $('.slot-machine').className = `slot-machine slot-${profile.key}`;
     renderControls();
@@ -595,7 +592,7 @@ $('#leave-button').addEventListener('click', async () => {
 
 $('#share-button').addEventListener('click', async () => {
   const route = state.run.wagers.map((wager) => (
-    `${String(wager.move).padStart(2, '0')}  ${tableNames[wager.table]}  ${wager.netChange >= 0 ? '+' : ''}${format(wager.netChange)}`
+    `${String(wager.move).padStart(2, '0')}  ${tableNames[wager.table]}  ${signedFormat(wager.netChange)}`
   )).join('\n');
   const text = [
     `Gamdle ${state.run.date}`,

@@ -67,8 +67,17 @@ function createRevealController(skipButton) {
       return void 0;
     }
   }
+  async function playReveal(resolution, settle2, animate2) {
+    begin(() => settle2(resolution));
+    if (reducedMotion()) {
+      finish();
+      return;
+    }
+    await animate2(resolution);
+    finish();
+  }
   skipButton.addEventListener("click", finish);
-  return { begin, track, finish, cancel, wait, reducedMotion };
+  return { begin, track, finish, cancel, wait, reducedMotion, playReveal };
 }
 
 // node_modules/motion-utils/dist/es/array.mjs
@@ -4914,6 +4923,28 @@ function createScopedAnimate(options = {}) {
 }
 var animate = createScopedAnimate();
 
+// src/roulette-colors.js
+var RED_NUMBERS = /* @__PURE__ */ new Set([
+  1,
+  3,
+  5,
+  7,
+  9,
+  12,
+  14,
+  16,
+  18,
+  19,
+  21,
+  23,
+  25,
+  27,
+  30,
+  32,
+  34,
+  36
+]);
+
 // frontend/game-geometry.js
 var EUROPEAN_WHEEL_ORDER = [
   0,
@@ -4954,26 +4985,6 @@ var EUROPEAN_WHEEL_ORDER = [
   3,
   26
 ];
-var RED_NUMBERS = /* @__PURE__ */ new Set([
-  1,
-  3,
-  5,
-  7,
-  9,
-  12,
-  14,
-  16,
-  18,
-  19,
-  21,
-  23,
-  25,
-  27,
-  30,
-  32,
-  34,
-  36
-]);
 var SLOT_SYMBOL_ORDER = ["cherry", "lemon", "gem", "seven"];
 var SLOT_SYMBOL_GLYPHS = {
   cherry: "\u25CF",
@@ -5082,41 +5093,37 @@ function createRouletteReveal({ controller, sound: sound2 }) {
   }
   async function play(resolution) {
     reset();
-    controller.begin(() => settle(resolution));
-    if (controller.reducedMotion()) {
-      controller.finish();
-      return;
-    }
-    sound2.play("wheel");
-    const trajectory = rouletteBallTrajectory(resolution.event.pocket);
-    const { landing, duration, times } = trajectory;
-    const wheelControl = controller.track(animate(
-      wheel,
-      { rotate: [0, landing.wheelRotation - 96, landing.wheelRotation - 22, landing.wheelRotation] },
-      { duration, times: [0, 0.68, 0.9, 1], ease: ["linear", "easeOut", [0.16, 1, 0.3, 1]] }
-    ));
-    const orbitControl = controller.track(animate(
-      orbit,
-      { rotate: trajectory.orbit },
-      { duration, times, ease: "linear" }
-    ));
-    const radiusControl = controller.track(animate(
-      radius,
-      { y: trajectory.radius },
-      { duration, times, ease: [0.4, 0, 0.2, 1] }
-    ));
-    const impactControl = controller.track(animate(
-      impact,
-      { x: trajectory.deflection, scale: trajectory.lift },
-      { duration, times, ease: "easeInOut" }
-    ));
-    await Promise.all([
-      controller.wait(wheelControl),
-      controller.wait(orbitControl),
-      controller.wait(radiusControl),
-      controller.wait(impactControl)
-    ]);
-    controller.finish();
+    await controller.playReveal(resolution, settle, async () => {
+      sound2.play("wheel");
+      const trajectory = rouletteBallTrajectory(resolution.event.pocket);
+      const { landing, duration, times } = trajectory;
+      const wheelControl = controller.track(animate(
+        wheel,
+        { rotate: [0, landing.wheelRotation - 96, landing.wheelRotation - 22, landing.wheelRotation] },
+        { duration, times: [0, 0.68, 0.9, 1], ease: ["linear", "easeOut", [0.16, 1, 0.3, 1]] }
+      ));
+      const orbitControl = controller.track(animate(
+        orbit,
+        { rotate: trajectory.orbit },
+        { duration, times, ease: "linear" }
+      ));
+      const radiusControl = controller.track(animate(
+        radius,
+        { y: trajectory.radius },
+        { duration, times, ease: [0.4, 0, 0.2, 1] }
+      ));
+      const impactControl = controller.track(animate(
+        impact,
+        { x: trajectory.deflection, scale: trajectory.lift },
+        { duration, times, ease: "easeInOut" }
+      ));
+      await Promise.all([
+        controller.wait(wheelControl),
+        controller.wait(orbitControl),
+        controller.wait(radiusControl),
+        controller.wait(impactControl)
+      ]);
+    });
   }
   return { reset, settle, play };
 }
@@ -5154,24 +5161,20 @@ function createCardReveal({ controller, sound: sound2 }) {
     reset();
     populate(resolution);
     copy.textContent = "Dealing today\u2019s card\u2026";
-    controller.begin(() => settle(resolution));
-    if (controller.reducedMotion()) {
-      controller.finish();
-      return;
-    }
-    sound2.play("cards");
-    const control = controller.track(animate(
-      card,
-      {
-        y: [-42, -10, 0, 0],
-        rotateY: [0, 0, 104, 180],
-        rotateZ: [-3, -1, 0.7, 0],
-        scale: [0.96, 1.02, 1.01, 1]
-      },
-      { duration: 1.65, times: [0, 0.3, 0.68, 1], ease: [0.22, 1, 0.36, 1] }
-    ));
-    await controller.wait(control);
-    controller.finish();
+    await controller.playReveal(resolution, settle, async () => {
+      sound2.play("cards");
+      const control = controller.track(animate(
+        card,
+        {
+          y: [-42, -10, 0, 0],
+          rotateY: [0, 0, 104, 180],
+          rotateZ: [-3, -1, 0.7, 0],
+          scale: [0.96, 1.02, 1.01, 1]
+        },
+        { duration: 1.65, times: [0, 0.3, 0.68, 1], ease: [0.22, 1, 0.36, 1] }
+      ));
+      await controller.wait(control);
+    });
   }
   return { reset, settle, play };
 }
@@ -5237,24 +5240,21 @@ function createDiceReveal({ controller, sound: sound2 }) {
   async function play(resolution) {
     reset();
     let completedPhysically = false;
-    controller.begin(() => settle(resolution, completedPhysically));
-    if (controller.reducedMotion()) {
-      controller.finish();
-      return;
-    }
-    const diceBox = await controller.wait(getBox());
-    if (!diceBox) {
-      controller.finish();
-      return;
-    }
-    placeholder.hidden = true;
-    boxElement.classList.add("visible");
-    sound2.play("dice");
-    const roll = diceBox.roll(`2d6@${resolution.event.die1},${resolution.event.die2}`);
-    await controller.wait(roll);
-    completedPhysically = diceBox.rolling === false;
-    settle(resolution, completedPhysically);
-    controller.finish();
+    await controller.playReveal(
+      resolution,
+      (res) => settle(res, completedPhysically),
+      async () => {
+        const diceBox = await controller.wait(getBox());
+        if (!diceBox) return;
+        placeholder.hidden = true;
+        boxElement.classList.add("visible");
+        sound2.play("dice");
+        const roll = diceBox.roll(`2d6@${resolution.event.die1},${resolution.event.die2}`);
+        await controller.wait(roll);
+        completedPhysically = diceBox.rolling === false;
+        settle(resolution, completedPhysically);
+      }
+    );
   }
   return { reset, settle, play };
 }
@@ -5293,36 +5293,32 @@ function createSlotsReveal({ controller, sound: sound2 }) {
   }
   async function play(resolution) {
     reset();
-    controller.begin(() => settle(resolution));
-    if (controller.reducedMotion()) {
-      controller.finish();
-      return;
-    }
-    const controls = reels.map((reel, index) => {
-      const strip = reel.querySelector(".reel-strip");
-      const landing = slotLanding(resolution.event.symbols[index], REEL_CYCLES);
-      const target = offsetFor(reel, landing.itemIndex);
-      const duration = 1.35 + index * 0.26;
-      const control = controller.track(animate(
-        strip,
-        {
-          y: [0, target + reel.clientHeight * 0.28, target - reel.clientHeight * 0.08, target],
-          filter: ["blur(0px)", "blur(3px)", "blur(1px)", "blur(0px)"]
-        },
-        { duration, times: [0, 0.78, 0.92, 1], ease: ["linear", "easeOut", [0.16, 1, 0.3, 1]] }
-      ));
-      control.then(() => {
-        if (reel.dataset.symbol !== landing.symbol) {
-          reel.dataset.symbol = landing.symbol;
-          sound2.play("reel", false, index);
-          lights[index + 1]?.classList.add("lit");
-        }
-      }).catch(() => {
+    await controller.playReveal(resolution, settle, async () => {
+      const controls = reels.map((reel, index) => {
+        const strip = reel.querySelector(".reel-strip");
+        const landing = slotLanding(resolution.event.symbols[index], REEL_CYCLES);
+        const target = offsetFor(reel, landing.itemIndex);
+        const duration = 1.35 + index * 0.26;
+        const control = controller.track(animate(
+          strip,
+          {
+            y: [0, target + reel.clientHeight * 0.28, target - reel.clientHeight * 0.08, target],
+            filter: ["blur(0px)", "blur(3px)", "blur(1px)", "blur(0px)"]
+          },
+          { duration, times: [0, 0.78, 0.92, 1], ease: ["linear", "easeOut", [0.16, 1, 0.3, 1]] }
+        ));
+        control.then(() => {
+          if (reel.dataset.symbol !== landing.symbol) {
+            reel.dataset.symbol = landing.symbol;
+            sound2.play("reel", false, index);
+            lights[index + 1]?.classList.add("lit");
+          }
+        }).catch(() => {
+        });
+        return control;
       });
-      return control;
+      await Promise.all(controls.map(controller.wait));
     });
-    await Promise.all(controls.map(controller.wait));
-    controller.finish();
   }
   return { reset, settle, play };
 }
@@ -5452,6 +5448,9 @@ var percent2 = (value) => {
   return `${scaled.toFixed(Number.isInteger(scaled) ? 0 : 1)}%`;
 };
 var multiplier = (value) => `${value.toFixed(value < 10 ? 2 : 1)}\xD7`;
+var signedFormat = (value) => `${value >= 0 ? "+" : ""}${format(value)}`;
+var changeClass = (value) => value >= 0 ? "positive" : "negative";
+var pluralize = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
 var ordinal = (number2) => {
   const suffix = number2 % 10 === 1 && number2 % 100 !== 11 ? "st" : number2 % 10 === 2 && number2 % 100 !== 12 ? "nd" : number2 % 10 === 3 && number2 % 100 !== 13 ? "rd" : "th";
   return `${number2}${suffix}`;
@@ -5509,12 +5508,7 @@ function setPhase(phase) {
   });
   $("#repeat-button").disabled = locked || state.run?.status !== "active";
 }
-function defaultSelection(table) {
-  const rules = state.rules.games[table];
-  if (table === "wheel") return rules.outsideBets[0];
-  if (table === "cards") return rules.bets.find((bet) => bet.key === "cards-over-7");
-  if (table === "dice") return rules.rangeBets[0];
-  const profile = rules.profiles[0];
+function slotSelection(profile) {
   return {
     key: `slots-${profile.key}`,
     label: profile.name,
@@ -5525,6 +5519,13 @@ function defaultSelection(table) {
     profile,
     variableReturn: true
   };
+}
+function defaultSelection(table) {
+  const rules = state.rules.games[table];
+  if (table === "wheel") return rules.outsideBets[0];
+  if (table === "cards") return rules.bets.find((bet) => bet.key === "cards-over-7");
+  if (table === "dice") return rules.rangeBets[0];
+  return slotSelection(rules.profiles[0]);
 }
 function setSelection(selection) {
   if (!selection) return;
@@ -5657,7 +5658,7 @@ function renderMoveTrack() {
 function renderHistory() {
   const history2 = $("#history");
   const wagers = state.run.wagers;
-  $("#history-count").textContent = wagers.length ? `${wagers.length} move${wagers.length === 1 ? "" : "s"} played` : "No moves yet";
+  $("#history-count").textContent = wagers.length ? `${pluralize(wagers.length, "move")} played` : "No moves yet";
   if (!wagers.length) {
     history2.innerHTML = '<p class="empty-state">Your first result will appear here. Every table is waiting.</p>';
     return;
@@ -5670,7 +5671,7 @@ function renderHistory() {
         <small>${wager.resultLabel}</small>
       </span>
       <span class="history-stake">${format(wager.stake)} staked</span>
-      <span class="history-change ${wager.netChange >= 0 ? "positive" : "negative"}">${wager.netChange >= 0 ? "+" : ""}${format(wager.netChange)}</span>
+      <span class="history-change ${changeClass(wager.netChange)}">${signedFormat(wager.netChange)}</span>
     </div>
   `).join("");
 }
@@ -5686,12 +5687,12 @@ function renderResults() {
   $("#player-count").textContent = format(results.totalPlayers);
   $("#broke-percent").textContent = `${results.brokePercent}%`;
   $("#share-score").textContent = `${format(state.run.bankroll)} points`;
-  $("#share-usage").textContent = state.run.wagers.length ? `${state.run.wagers.length} move${state.run.wagers.length === 1 ? "" : "s"} \xB7 wager details hidden` : "Stopped before placing a wager";
+  $("#share-usage").textContent = state.run.wagers.length ? `${pluralize(state.run.wagers.length, "move")} \xB7 wager details hidden` : "Stopped before placing a wager";
   $("#share-route").innerHTML = state.run.wagers.map((wager) => `
     <div class="share-route-row">
       <span>${String(wager.move).padStart(2, "0")}</span>
       <strong>${tableNames[wager.table]}</strong>
-      <b class="${wager.netChange >= 0 ? "positive" : "negative"}">${wager.netChange >= 0 ? "+" : ""}${format(wager.netChange)}</b>
+      <b class="${changeClass(wager.netChange)}">${signedFormat(wager.netChange)}</b>
     </div>
   `).join("");
   $("#achievements").innerHTML = state.run.achievements.length ? state.run.achievements.map((item) => `<div class="achievement"><strong>${item.name}</strong><small>${item.description}</small></div>`).join("") : '<p class="empty-state">No achievement stamps today. The cabinet keeps waiting.</p>';
@@ -5699,15 +5700,15 @@ function renderResults() {
     <div class="leader-row">
       <span>${index + 1}</span>
       <strong>${format(row.bankroll)} points</strong>
-      <small>${row.players} player${row.players === 1 ? "" : "s"}</small>
+      <small>${pluralize(row.players, "player")}</small>
     </div>`).join("");
 }
 function renderRun() {
   $("#bankroll").textContent = format(state.run.bankroll);
   $("#move").textContent = state.run.move;
   const profitLoss = state.run.bankroll - state.rules.startingBankroll;
-  $("#profit-loss").textContent = `${profitLoss >= 0 ? "+" : ""}${format(profitLoss)}`;
-  $("#profit-loss").className = profitLoss >= 0 ? "positive" : "negative";
+  $("#profit-loss").textContent = signedFormat(profitLoss);
+  $("#profit-loss").className = changeClass(profitLoss);
   $("#stake").max = state.run.bankroll;
   if (Number($("#stake").value) > state.run.bankroll) $("#stake").value = state.run.bankroll;
   $("#date-label").textContent = (/* @__PURE__ */ new Date(`${state.run.date}T12:00:00Z`)).toLocaleDateString(void 0, {
@@ -5728,8 +5729,8 @@ function showResolution(resolution) {
   $("#result-kicker").textContent = `Move ${state.run.move} resolved`;
   $("#result-title").textContent = resolution.won ? "Wager won" : "Wager lost";
   $("#result-detail").textContent = `${resolution.label}. Bankroll: ${format(resolution.bankroll)} points.`;
-  $("#result-change").textContent = `${resolution.netChange >= 0 ? "+" : ""}${format(resolution.netChange)}`;
-  $("#result-change").className = resolution.netChange >= 0 ? "positive" : "negative";
+  $("#result-change").textContent = signedFormat(resolution.netChange);
+  $("#result-change").className = changeClass(resolution.netChange);
   $("#repeat-button").hidden = state.run.status !== "active";
   sound.play("result", resolution.won);
 }
@@ -5882,16 +5883,7 @@ $("#bet-controls").addEventListener("click", (event) => {
   }
   if (button.dataset.profile) {
     const profile = state.rules.games.slots.profiles.find((item) => item.key === button.dataset.profile);
-    state.selection = {
-      key: `slots-${profile.key}`,
-      label: profile.name,
-      probability: profile.winProbability,
-      multiplier: profile.maxMultiplier,
-      risk: profile.risk,
-      bet: { profile: profile.key },
-      profile,
-      variableReturn: true
-    };
+    state.selection = slotSelection(profile);
     $("#slot-profile-label").textContent = profile.name.toUpperCase();
     $(".slot-machine").className = `slot-machine slot-${profile.key}`;
     renderControls();
@@ -5945,7 +5937,7 @@ $("#leave-button").addEventListener("click", async () => {
   }
 });
 $("#share-button").addEventListener("click", async () => {
-  const route = state.run.wagers.map((wager) => `${String(wager.move).padStart(2, "0")}  ${tableNames[wager.table]}  ${wager.netChange >= 0 ? "+" : ""}${format(wager.netChange)}`).join("\n");
+  const route = state.run.wagers.map((wager) => `${String(wager.move).padStart(2, "0")}  ${tableNames[wager.table]}  ${signedFormat(wager.netChange)}`).join("\n");
   const text = [
     `Gamdle ${state.run.date}`,
     `${format(state.run.bankroll)} points in ${state.run.move} moves`,

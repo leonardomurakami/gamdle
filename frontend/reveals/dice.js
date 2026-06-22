@@ -62,26 +62,22 @@ export function createDiceReveal({ controller, sound }) {
   async function play(resolution) {
     reset();
     let completedPhysically = false;
-    controller.begin(() => settle(resolution, completedPhysically));
-    if (controller.reducedMotion()) {
-      controller.finish();
-      return;
-    }
+    await controller.playReveal(
+      resolution,
+      (res) => settle(res, completedPhysically),
+      async () => {
+        const diceBox = await controller.wait(getBox());
+        if (!diceBox) return;
 
-    const diceBox = await controller.wait(getBox());
-    if (!diceBox) {
-      controller.finish();
-      return;
-    }
-
-    placeholder.hidden = true;
-    boxElement.classList.add('visible');
-    sound.play('dice');
-    const roll = diceBox.roll(`2d6@${resolution.event.die1},${resolution.event.die2}`);
-    await controller.wait(roll);
-    completedPhysically = diceBox.rolling === false;
-    settle(resolution, completedPhysically);
-    controller.finish();
+        placeholder.hidden = true;
+        boxElement.classList.add('visible');
+        sound.play('dice');
+        const roll = diceBox.roll(`2d6@${resolution.event.die1},${resolution.event.die2}`);
+        await controller.wait(roll);
+        completedPhysically = diceBox.rolling === false;
+        settle(resolution, completedPhysically);
+      },
+    );
   }
 
   return { reset, settle, play };

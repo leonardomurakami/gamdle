@@ -64,24 +64,22 @@ Within the previous 15 minutes:
 
 Exceeding either limit returns HTTP `429`.
 
-## Email Change
+## Username
 
-Changing email requires an authenticated session and verification of both addresses.
+Players can set a display username for leaderboards and account display.
 
-1. The player submits a different valid email.
-2. If the new address is already used, the response remains generic.
-3. An `email_changes` record is created with a 15-minute expiry.
-4. One token is sent to the current address.
-5. One token is sent to the proposed address.
-6. Each token marks its corresponding verification timestamp.
-7. Once both are verified before expiry, the user's email is updated and the change is marked complete.
+1. The player submits a username via `POST /api/account/username`.
+2. The server validates: 2–20 characters, letters, numbers, spaces, hyphens, and underscores only.
+3. Uniqueness is enforced — duplicate usernames return HTTP `409`.
+4. The username is stored on the `users` table and included in authenticated API responses.
+5. If no username is set, the account dialog prompts the player to choose one.
 
 ## Account Deletion
 
 - An authenticated player requests a fresh deletion link.
 - Existing unused deletion tokens for that account are invalidated.
 - Opening the one-time token deletes the user.
-- Foreign-key cascades delete sessions, tokens, email changes, runs, wagers, and achievements associated with the account.
+- Foreign-key cascades delete sessions, tokens, runs, wagers, and achievements associated with the account.
 - The browser session cookie is expired.
 
 ## Request Security

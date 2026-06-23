@@ -22,7 +22,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY src ./src
-COPY public/index.html public/styles.css ./public/
+COPY public/index.html public/styles.css public/favicon.svg ./public/
 COPY --from=build /app/public/app.js /app/public/dice-box.js ./public/
 
 RUN chown -R node:node /app

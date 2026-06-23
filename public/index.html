@@ -240,13 +240,16 @@
         <button id="account-close" class="icon-button" type="button" aria-label="Close account settings">×</button>
       </div>
       <div id="authenticated-settings">
-        <form id="change-email-form" class="settings-form">
-          <label for="new-email">Change email</label>
+        <div id="username-setup-prompt" class="message" role="status" hidden>
+          <p>Set a username to appear on leaderboards.</p>
+        </div>
+        <form id="username-form" class="settings-form">
+          <label for="username-input">Display name</label>
           <div class="settings-row">
-            <input id="new-email" type="email" placeholder="new@example.com" required>
-            <button type="submit">Send both links</button>
+            <input id="username-input" type="text" placeholder="Your name" maxlength="20" required>
+            <button type="submit" data-label="Save username">Save username</button>
           </div>
-          <small>You must open a link sent to both addresses.</small>
+          <small>2–20 characters. Letters, numbers, spaces, hyphens, and underscores.</small>
         </form>
         <div id="account-message" class="message" role="status" hidden></div>
         <div class="account-actions">
@@ -266,6 +269,22 @@
         </form>
         <div id="login-message" class="message" role="status" hidden></div>
       </div>
+    </dialog>
+
+    <dialog id="username-setup-dialog" aria-labelledby="username-setup-title">
+      <div class="dialog-heading">
+        <div><p>Welcome to Gamdle</p><h2 id="username-setup-title">Choose your display name</h2></div>
+      </div>
+      <p>This name appears on leaderboards. You can change it later in account settings.</p>
+      <form id="username-setup-form" class="settings-form">
+        <label for="username-setup-input">Display name</label>
+        <div class="settings-row">
+          <input id="username-setup-input" type="text" placeholder="Your name" maxlength="20" required>
+          <button type="submit" data-label="Continue">Continue</button>
+        </div>
+        <small>2–20 characters. Letters, numbers, spaces, hyphens, and underscores.</small>
+      </form>
+      <div id="username-setup-message" class="message" role="status" hidden></div>
     </dialog>
 
     <dialog id="how-to-dialog" class="how-to-dialog" aria-labelledby="how-to-title">

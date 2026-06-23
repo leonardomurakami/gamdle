@@ -83,7 +83,7 @@ async function currentUser(req) {
   const token = parseCookies(req.headers.cookie).gamdle_session || bearer;
   if (!token) return null;
   return await db.get(`
-    SELECT users.id, users.email
+    SELECT users.id, users.email, users.username
     FROM sessions JOIN users ON users.id = sessions.user_id
     WHERE sessions.token_hash = ? AND sessions.expires_at > ?
   `, hashToken(token), Date.now());
@@ -171,7 +171,7 @@ async function sendLink(email, purpose, userId = null, metadata = null) {
   const link = `${config.baseUrl}/auth/verify?token=${encodeURIComponent(raw)}`;
   await deliverEmail(
     email,
-    purpose === 'login' ? 'Your Gamdle sign-in link' : 'Confirm your Gamdle account change',
+    purpose === 'login' ? 'Your Gamdle sign-in link' : 'Confirm your Gamdle account deletion',
     `Open this one-time link within 15 minutes:\n\n${link}\n\nIf you did not request this, ignore this email.`,
     `<p>Open this one-time link within 15 minutes:</p><p><a href="${link}">Continue to Gamdle</a></p><p>If you did not request this, ignore this email.</p>`,
   );
@@ -265,11 +265,19 @@ async function leaderboardPayload(run) {
       SUM(CASE WHEN bankroll = 0 THEN 1 ELSE 0 END) AS broke
     FROM daily_runs WHERE run_date = ? AND status != 'active'
   `, run.bankroll, run.run_date);
+  const topPlayers = await db.all(`
+    SELECT users.username, daily_runs.bankroll
+    FROM daily_runs JOIN users ON users.id = daily_runs.user_id
+    WHERE daily_runs.run_date = ? AND daily_runs.status != 'active'
+      AND users.username IS NOT NULL
+    ORDER BY daily_runs.bankroll DESC LIMIT 10
+  `, run.run_date);
   const total = Number(totals.total || 0);
   const atOrBelow = Number(totals.at_or_below || 0);
   const broke = Number(totals.broke || 0);
   return {
     leaderboard: rows.map((row) => ({ ...row, players: Number(row.players) })),
+    topPlayers: topPlayers.map((row) => ({ username: row.username, bankroll: row.bankroll })),
     percentile: total ? Math.round((atOrBelow / total) * 100) : 100,
     totalPlayers: total,
     brokePercent: total ? Math.round((broke / total) * 100) : 0,
@@ -493,28 +501,21 @@ async function handleApi(req, res, url) {
     return json(res, 200, { run: await runPayload(updated, user.id) });
   }
 
-  if (req.method === 'POST' && url.pathname === '/api/account/change-email') {
+  if (req.method === 'POST' && url.pathname === '/api/account/username') {
     const user = await requireUser(req, res);
     if (!user) return;
-    const { email: rawEmail } = await readJson(req);
-    const newEmail = normalizeEmail(rawEmail);
-    if (newEmail === user.email) return json(res, 400, { error: 'That is already your account email.' });
-    if (await db.get('SELECT 1 FROM users WHERE email = ?', newEmail)) {
-      return json(res, 200, { message: 'Verification links have been sent if that address is available.' });
+    const { username: rawUsername } = await readJson(req);
+    const username = String(rawUsername || '').trim();
+    if (username.length < 2 || username.length > 20) {
+      return json(res, 400, { error: 'Username must be 2–20 characters.' });
     }
-    const now = Date.now();
-    const result = await db.run(`
-      INSERT INTO email_changes (user_id, old_email, new_email, expires_at, created_at)
-      VALUES (?, ?, ?, ?, ?)
-      RETURNING id
-    `, user.id, user.email, newEmail, now + config.loginTtlMs, now);
-    const requestId = Number(result.lastInsertRowid);
-    const oldLink = await sendLink(user.email, 'email_change_old', user.id, { requestId });
-    const newLink = await sendLink(newEmail, 'email_change_new', user.id, { requestId });
-    return json(res, 200, {
-      message: 'Open both verification emails within 15 minutes to complete the change.',
-      ...(!config.isProduction ? { developmentLinks: [oldLink, newLink] } : {}),
-    });
+    if (!/^[a-zA-Z0-9_\- ]+$/.test(username)) {
+      return json(res, 400, { error: 'Username may only contain letters, numbers, spaces, hyphens, and underscores.' });
+    }
+    const existing = await db.get('SELECT 1 FROM users WHERE username = ? AND id != ?', username, user.id);
+    if (existing) return json(res, 409, { error: 'That username is taken.' });
+    await db.run('UPDATE users SET username = ? WHERE id = ?', username, user.id);
+    return json(res, 200, { username });
   }
 
   if (req.method === 'POST' && url.pathname === '/api/account/delete') {
@@ -555,26 +556,6 @@ async function handleVerification(res, url) {
     return redirect(res, '/?account=deleted', { 'Set-Cookie': clearSessionCookie(config.isProduction) });
   }
 
-  if (token.purpose.startsWith('email_change_')) {
-    let requestId;
-    try {
-      ({ requestId } = JSON.parse(token.metadata || '{}'));
-    } catch {
-      return redirect(res, '/?auth=invalid');
-    }
-    if (!requestId) return redirect(res, '/?auth=invalid');
-    const column = token.purpose === 'email_change_old' ? 'old_verified_at' : 'new_verified_at';
-    await db.run(`UPDATE email_changes SET ${column} = ? WHERE id = ? AND expires_at > ? AND completed_at IS NULL`,
-      now, requestId, now);
-    const request = await db.get('SELECT * FROM email_changes WHERE id = ?', requestId);
-    if (request?.old_verified_at && request?.new_verified_at && !request.completed_at) {
-      await db.run('UPDATE users SET email = ? WHERE id = ?', request.new_email, request.user_id);
-      await db.run('UPDATE email_changes SET completed_at = ? WHERE id = ?', now, requestId);
-      return redirect(res, '/?account=email-changed');
-    }
-    return redirect(res, '/?account=email-half-confirmed');
-  }
-
   return redirect(res, '/?auth=invalid');
 }
 
@@ -584,6 +565,7 @@ function serveStatic(res, pathname) {
     '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
     '/dice-box.js': ['dice-box.js', 'text/javascript; charset=utf-8'],
     '/styles.css': ['styles.css', 'text/css; charset=utf-8'],
+    '/favicon.svg': ['favicon.svg', 'image/svg+xml'],
   };
   const entry = files[pathname];
   if (!entry) return false;

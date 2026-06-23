@@ -15,7 +15,6 @@ test('createDatabase with string path creates SQLite database', async () => {
   assert.ok(tables.includes('achievements'));
   assert.ok(tables.includes('app_meta'));
   assert.ok(tables.includes('auth_attempts'));
-  assert.ok(tables.includes('email_changes'));
 });
 
 test('createDatabase with options object and no databaseUrl falls back to SQLite', async () => {

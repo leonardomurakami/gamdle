@@ -32,7 +32,8 @@ Response:
 {
   "user": {
     "id": 1,
-    "email": "player@example.com"
+    "email": "player@example.com",
+    "username": "PlayerOne"
   }
 }
 ```
@@ -47,7 +48,7 @@ Response:
 
 ```json
 {
-  "user": { "id": 1, "email": "player@example.com" },
+  "user": { "id": 1, "email": "player@example.com", "username": "PlayerOne" },
   "rules": {
     "version": 2,
     "rtp": 0.96,
@@ -76,7 +77,7 @@ Active run fields:
 }
 ```
 
-Finished runs additionally include `results` with leaderboard rows, percentile, total players, and broke percentage.
+Finished runs additionally include `results` with leaderboard rows, top players (with usernames), percentile, total players, and broke percentage.
 
 ### `POST /api/game/play`
 
@@ -125,15 +126,15 @@ For slots, `event` contains only the three resolved symbols.
 
 Finishes an active run with status `left`. Repeated calls return the existing finished run.
 
-### `POST /api/account/change-email`
+### `POST /api/account/username`
 
 Request:
 
 ```json
-{ "email": "new@example.com" }
+{ "username": "PlayerOne" }
 ```
 
-Creates the dual-verification email-change flow.
+Sets or updates the display name shown on leaderboards. Validates 2–20 characters (letters, numbers, spaces, hyphens, underscores) and enforces uniqueness.
 
 ### `POST /api/account/delete`
 
@@ -141,7 +142,7 @@ Creates and sends a fresh one-time deletion link.
 
 ### `GET /auth/verify?token=...`
 
-Consumes login, email-change, or deletion tokens and redirects to an appropriate app status URL.
+Consumes login or deletion tokens and redirects to an appropriate app status URL.
 
 ## Database
 
@@ -149,11 +150,11 @@ SQLite uses foreign keys and WAL mode.
 
 ### `users`
 
-One row per normalized email account.
+One row per normalized email account. Includes an optional display `username` for leaderboards.
 
 ### `auth_tokens`
 
-Hashed one-time tokens for login, deletion, and both sides of email changes. Includes purpose, email, optional user, JSON metadata, expiry, used timestamp, and creation timestamp.
+Hashed one-time tokens for login and deletion. Includes purpose, email, optional user, JSON metadata, expiry, used timestamp, and creation timestamp.
 
 ### `sessions`
 
@@ -162,10 +163,6 @@ Hashed 30-day session tokens linked to users.
 ### `auth_attempts`
 
 Email/IP request records used by login rate limiting.
-
-### `email_changes`
-
-Tracks current address, proposed address, both verification timestamps, expiry, and completion.
 
 ### `daily_runs`
 

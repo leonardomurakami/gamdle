@@ -47,6 +47,12 @@ const tableNames = {
   slots: 'Lucky Slots',
 };
 
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[char]);
+}
+
 const tableIcons = {
   wheel: '\u25c9',
   cards: 'A\u2660',
@@ -136,8 +142,6 @@ function queryMessages() {
   const messages = {
     invalid: 'That link is invalid, expired, or has already been used.',
     deleted: 'Your account and game history have been deleted.',
-    'email-changed': 'Your account email has been changed.',
-    'email-half-confirmed': 'One address is confirmed. Open the link sent to the other address.',
   };
   const key = params.get('auth') || params.get('account');
   if (messages[key]) showToast(messages[key]);
@@ -369,12 +373,21 @@ function renderResults() {
   $('#achievements').innerHTML = state.run.achievements.length
     ? state.run.achievements.map((item) => `<div class="achievement"><strong>${item.name}</strong><small>${item.description}</small></div>`).join('')
     : '<p class="empty-state">No achievement stamps today. The cabinet keeps waiting.</p>';
-  $('#leaderboard').innerHTML = results.leaderboard.map((row, index) => `
+  const topHtml = results.topPlayers?.length
+    ? '<h3 class="leaderboard-subtitle">Top players</h3>' + results.topPlayers.map((row, index) => `
+      <div class="leader-row named">
+        <span>${index + 1}</span>
+        <strong>${escapeHtml(row.username)}</strong>
+        <small>${format(row.bankroll)} points</small>
+      </div>`).join('')
+    : '';
+  const tierHtml = results.leaderboard.map((row, index) => `
     <div class="leader-row">
       <span>${index + 1}</span>
       <strong>${format(row.bankroll)} points</strong>
       <small>${pluralize(row.players, 'player')}</small>
     </div>`).join('');
+  $('#leaderboard').innerHTML = topHtml + tierHtml;
 }
 
 function renderRun() {
@@ -584,7 +597,19 @@ async function loadGame(mode = 'account') {
   state.selection = defaultSelection(state.table);
   saveAnonymousState();
   $('#game-view').hidden = false;
-  $('#account-email').textContent = mode === 'guest' ? 'Guest player' : state.user.email;
+  const displayName = mode === 'guest' ? 'Guest player' : (state.user.username || state.user.email);
+  $('#account-email').textContent = displayName;
+  if (mode !== 'guest' && !state.user.username) {
+    $('#username-setup-prompt').hidden = false;
+    const setupInput = $('#username-setup-input');
+    if (setupInput) setupInput.value = '';
+    $('#username-setup-dialog').showModal();
+  } else {
+    $('#username-setup-prompt').hidden = true;
+    if ($('#username-setup-dialog').open) $('#username-setup-dialog').close();
+  }
+  const usernameInput = $('#username-input');
+  if (usernameInput) usernameInput.value = state.user?.username || '';
   $('#account-button').textContent = mode === 'guest' ? 'Sign in' : 'Account';
   $('#authenticated-settings').hidden = mode === 'guest';
   $('#anonymous-settings').hidden = mode !== 'guest';
@@ -769,29 +794,41 @@ $('#logout-button').addEventListener('click', async () => {
   location.reload();
 });
 
-$('#change-email-form').addEventListener('submit', async (event) => {
-  event.preventDefault();
+async function submitUsername(inputSelector, messageSelector, button) {
+  button.disabled = true;
+  button.textContent = 'Saving…';
   try {
-    const body = await api('/api/account/change-email', {
+    const body = await api('/api/account/username', {
       method: 'POST',
-      body: JSON.stringify({ email: $('#new-email').value }),
+      body: JSON.stringify({ username: $(inputSelector).value }),
     });
-    const message = $('#account-message');
+    state.user.username = body.username;
+    $('#account-email').textContent = body.username;
+    $('#username-setup-prompt').hidden = true;
+    if ($('#username-setup-dialog').open) $('#username-setup-dialog').close();
+    const message = $(messageSelector);
     message.hidden = false;
-    message.textContent = '';
-    message.append(body.message);
-    if (body.developmentLinks) {
-      for (const [index, url] of body.developmentLinks.entries()) {
-        message.append(document.createElement('br'));
-        const link = document.createElement('a');
-        link.href = url;
-        link.textContent = `Open ${index ? 'new' : 'current'} email link`;
-        message.append(link);
-      }
-    }
+    message.textContent = 'Username saved.';
   } catch (error) {
     showToast(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = button.dataset.label || 'Save username';
   }
+}
+
+$('#username-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  await submitUsername('#username-input', '#account-message', event.currentTarget.querySelector('button'));
+});
+
+$('#username-setup-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  await submitUsername('#username-setup-input', '#username-setup-message', event.currentTarget.querySelector('button'));
+});
+
+$('#username-setup-dialog').addEventListener('cancel', (event) => {
+  if (!state.user?.username) event.preventDefault();
 });
 
 $('#delete-button').addEventListener('click', async () => {

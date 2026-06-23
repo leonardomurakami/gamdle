@@ -46,7 +46,7 @@ export function createRouletteReveal({ controller, sound }) {
       const targetIndex = roulettePocketIndex(resolution.event.pocket);
       const totalPockets = EUROPEAN_WHEEL_ORDER.length;
 
-      const cycles = 4;
+      const cycles = 3;
       const totalAdvances = cycles * totalPockets + targetIndex;
 
       const minInterval = 30;

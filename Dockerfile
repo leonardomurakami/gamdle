@@ -8,6 +8,7 @@ FROM deps AS build
 
 COPY frontend ./frontend
 COPY public ./public
+COPY src ./src
 RUN npm run build
 
 FROM node:24-bookworm-slim AS runtime

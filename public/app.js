@@ -4996,56 +4996,6 @@ var WHEEL_STEP = 360 / EUROPEAN_WHEEL_ORDER.length;
 function roulettePocketIndex(pocket) {
   return EUROPEAN_WHEEL_ORDER.indexOf(Number(pocket));
 }
-function roulettePocketCenter(pocket) {
-  const index = roulettePocketIndex(pocket);
-  if (index < 0) throw new Error(`Unknown roulette pocket: ${pocket}`);
-  return -90 + (index + 0.5) * WHEEL_STEP;
-}
-function rouletteLanding(pocket, wheelTurns = 4, ballTurns = 5) {
-  const center = roulettePocketCenter(pocket);
-  const wheelRotation = wheelTurns * 360 - 90 - center;
-  const ballRotation = -ballTurns * 360;
-  return {
-    pocket: Number(pocket),
-    pocketIndex: roulettePocketIndex(pocket),
-    pocketCenter: center,
-    wheelRotation,
-    ballRotation,
-    relativePocketAngle: normalizeAngle(center + wheelRotation),
-    relativeBallAngle: normalizeAngle(-90 + ballRotation)
-  };
-}
-function rouletteBallTrajectory(pocket) {
-  const landing = rouletteLanding(pocket, 4, 7);
-  return {
-    landing,
-    duration: 2.35,
-    times: [0, 0.12, 0.24, 0.36, 0.48, 0.58, 0.66, 0.72, 0.78, 0.83, 0.88, 0.93, 0.97, 0.99, 1],
-    radius: [0, 0.8, 2.2, 4.5, 7.5, 11, 14, 17, 20, 23, 26, 28.5, 30, 31.5, 31],
-    orbit: [
-      0,
-      landing.ballRotation * 0.17,
-      landing.ballRotation * 0.34,
-      landing.ballRotation * 0.5,
-      landing.ballRotation * 0.64,
-      landing.ballRotation * 0.74,
-      landing.ballRotation * 0.82,
-      landing.ballRotation * 0.87,
-      landing.ballRotation * 0.91,
-      landing.ballRotation * 0.94,
-      landing.ballRotation * 0.965,
-      landing.ballRotation * 0.983,
-      landing.ballRotation * 0.995,
-      landing.ballRotation * 0.999,
-      landing.ballRotation
-    ],
-    deflection: [0, 0, 0, 0, 0, 0.5, -0.8, 1.4, -1.8, 2.3, -1.7, 1.1, -0.5, -0.2, 0],
-    lift: [1, 1, 1, 1, 1, 1.01, 1, 1.025, 0.99, 1.045, 0.985, 1.025, 0.995, 0.998, 1]
-  };
-}
-function normalizeAngle(angle) {
-  return (angle % 360 + 360) % 360;
-}
 function slotLanding(symbol, cycles = 4) {
   const symbolIndex = SLOT_SYMBOL_ORDER.indexOf(symbol);
   if (symbolIndex < 0) throw new Error(`Unknown slot symbol: ${symbol}`);
@@ -5072,57 +5022,49 @@ function renderWheelNumbers(group) {
 }
 function createRouletteReveal({ controller, sound: sound2 }) {
   const wheel = document.querySelector("#roulette-wheel");
-  const orbit = document.querySelector("#roulette-ball-orbit");
-  const radius = document.querySelector("#roulette-ball-radius");
-  const impact = document.querySelector("#roulette-ball-impact");
   const result = document.querySelector("#wheel-result");
+  const pocketPaths = () => [...document.querySelectorAll("#wheel-numbers path")];
   function reset() {
     wheel.style.transform = "rotate(0deg)";
-    orbit.style.transform = "rotate(0deg)";
-    radius.style.transform = "translateY(0)";
-    impact.style.transform = "translateX(0) scale(1)";
     result.textContent = "?";
+    pocketPaths().forEach((p) => p.classList.remove("pocket-lit"));
   }
   function settle(resolution) {
-    const { landing } = rouletteBallTrajectory(resolution.event.pocket);
-    wheel.style.transform = `rotate(${landing.wheelRotation}deg)`;
-    orbit.style.transform = `rotate(${landing.ballRotation}deg)`;
-    radius.style.transform = "translateY(31px)";
-    impact.style.transform = "translateX(0) scale(1)";
+    pocketPaths().forEach((p) => p.classList.remove("pocket-lit"));
+    const paths = pocketPaths();
+    const idx = roulettePocketIndex(resolution.event.pocket);
+    if (paths[idx]) paths[idx].classList.add("pocket-lit");
     result.textContent = resolution.event.pocket;
   }
   async function play(resolution) {
     reset();
     await controller.playReveal(resolution, settle, async () => {
       sound2.play("wheel");
-      const trajectory = rouletteBallTrajectory(resolution.event.pocket);
-      const { landing, duration, times } = trajectory;
-      const wheelControl = controller.track(animate(
-        wheel,
-        { rotate: [0, landing.wheelRotation - 96, landing.wheelRotation - 22, landing.wheelRotation] },
-        { duration, times: [0, 0.68, 0.9, 1], ease: ["linear", "easeOut", [0.16, 1, 0.3, 1]] }
-      ));
-      const orbitControl = controller.track(animate(
-        orbit,
-        { rotate: trajectory.orbit },
-        { duration, times, ease: "linear" }
-      ));
-      const radiusControl = controller.track(animate(
-        radius,
-        { y: trajectory.radius },
-        { duration, times, ease: [0.4, 0, 0.2, 1] }
-      ));
-      const impactControl = controller.track(animate(
-        impact,
-        { x: trajectory.deflection, scale: trajectory.lift },
-        { duration, times, ease: "easeInOut" }
-      ));
-      await Promise.all([
-        controller.wait(wheelControl),
-        controller.wait(orbitControl),
-        controller.wait(radiusControl),
-        controller.wait(impactControl)
-      ]);
+      const paths = pocketPaths();
+      const targetIndex = roulettePocketIndex(resolution.event.pocket);
+      const totalPockets = EUROPEAN_WHEEL_ORDER.length;
+      const cycles = 4;
+      const totalAdvances = cycles * totalPockets + targetIndex;
+      const minInterval = 30;
+      const maxInterval = 240;
+      let advance = 0;
+      await new Promise((resolveAnim) => {
+        function frame2() {
+          paths.forEach((p) => p.classList.remove("pocket-lit"));
+          const current = advance % totalPockets;
+          const lit = paths[current];
+          if (lit) lit.classList.add("pocket-lit");
+          advance++;
+          if (advance > totalAdvances) {
+            resolveAnim();
+            return;
+          }
+          const progress2 = advance / totalAdvances;
+          const interval = minInterval + (maxInterval - minInterval) * Math.pow(progress2, 2);
+          setTimeout(frame2, interval);
+        }
+        frame2();
+      });
     });
   }
   return { reset, settle, play };
@@ -5885,6 +5827,9 @@ async function placeWager() {
       renderControls();
       gameAnimations.reset(nextTable);
       $("#result-ribbon").hidden = true;
+    } else if (state.run.status === "active") {
+      renderStage();
+      renderControls();
     }
   } catch (error) {
     showToast(error.message);

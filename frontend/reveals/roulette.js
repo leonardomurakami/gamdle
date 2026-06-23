@@ -1,8 +1,7 @@
-import { animate } from 'motion';
 import {
   EUROPEAN_WHEEL_ORDER,
   RED_NUMBERS,
-  rouletteBallTrajectory,
+  roulettePocketIndex,
 } from '../game-geometry.js';
 
 const point = (radius, angle) => `${160 + Math.cos(angle) * radius},${160 + Math.sin(angle) * radius}`;
@@ -22,25 +21,20 @@ export function renderWheelNumbers(group) {
 
 export function createRouletteReveal({ controller, sound }) {
   const wheel = document.querySelector('#roulette-wheel');
-  const orbit = document.querySelector('#roulette-ball-orbit');
-  const radius = document.querySelector('#roulette-ball-radius');
-  const impact = document.querySelector('#roulette-ball-impact');
   const result = document.querySelector('#wheel-result');
+  const pocketPaths = () => [...document.querySelectorAll('#wheel-numbers path')];
 
   function reset() {
     wheel.style.transform = 'rotate(0deg)';
-    orbit.style.transform = 'rotate(0deg)';
-    radius.style.transform = 'translateY(0)';
-    impact.style.transform = 'translateX(0) scale(1)';
     result.textContent = '?';
+    pocketPaths().forEach((p) => p.classList.remove('pocket-lit'));
   }
 
   function settle(resolution) {
-    const { landing } = rouletteBallTrajectory(resolution.event.pocket);
-    wheel.style.transform = `rotate(${landing.wheelRotation}deg)`;
-    orbit.style.transform = `rotate(${landing.ballRotation}deg)`;
-    radius.style.transform = 'translateY(31px)';
-    impact.style.transform = 'translateX(0) scale(1)';
+    pocketPaths().forEach((p) => p.classList.remove('pocket-lit'));
+    const paths = pocketPaths();
+    const idx = roulettePocketIndex(resolution.event.pocket);
+    if (paths[idx]) paths[idx].classList.add('pocket-lit');
     result.textContent = resolution.event.pocket;
   }
 
@@ -48,34 +42,37 @@ export function createRouletteReveal({ controller, sound }) {
     reset();
     await controller.playReveal(resolution, settle, async () => {
       sound.play('wheel');
-      const trajectory = rouletteBallTrajectory(resolution.event.pocket);
-      const { landing, duration, times } = trajectory;
-      const wheelControl = controller.track(animate(
-        wheel,
-        { rotate: [0, landing.wheelRotation - 96, landing.wheelRotation - 22, landing.wheelRotation] },
-        { duration, times: [0, 0.68, 0.9, 1], ease: ['linear', 'easeOut', [0.16, 1, 0.3, 1]] },
-      ));
-      const orbitControl = controller.track(animate(
-        orbit,
-        { rotate: trajectory.orbit },
-        { duration, times, ease: 'linear' },
-      ));
-      const radiusControl = controller.track(animate(
-        radius,
-        { y: trajectory.radius },
-        { duration, times, ease: [0.4, 0, 0.2, 1] },
-      ));
-      const impactControl = controller.track(animate(
-        impact,
-        { x: trajectory.deflection, scale: trajectory.lift },
-        { duration, times, ease: 'easeInOut' },
-      ));
-      await Promise.all([
-        controller.wait(wheelControl),
-        controller.wait(orbitControl),
-        controller.wait(radiusControl),
-        controller.wait(impactControl),
-      ]);
+      const paths = pocketPaths();
+      const targetIndex = roulettePocketIndex(resolution.event.pocket);
+      const totalPockets = EUROPEAN_WHEEL_ORDER.length;
+
+      const cycles = 4;
+      const totalAdvances = cycles * totalPockets + targetIndex;
+
+      const minInterval = 30;
+      const maxInterval = 240;
+
+      let advance = 0;
+
+      await new Promise((resolveAnim) => {
+        function frame() {
+          paths.forEach((p) => p.classList.remove('pocket-lit'));
+          const current = advance % totalPockets;
+          const lit = paths[current];
+          if (lit) lit.classList.add('pocket-lit');
+
+          advance++;
+          if (advance > totalAdvances) {
+            resolveAnim();
+            return;
+          }
+
+          const progress = advance / totalAdvances;
+          const interval = minInterval + (maxInterval - minInterval) * Math.pow(progress, 2);
+          setTimeout(frame, interval);
+        }
+        frame();
+      });
     });
   }
 

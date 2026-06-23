@@ -14,6 +14,8 @@ services:
       DATABASE_URL: "postgres://gamdle:${POSTGRES_PASSWORD:-gamdle}@postgres:5432/gamdle"
       DAILY_SEED_SECRET: "${DAILY_SEED_SECRET:-development-only-daily-seed}"
       EMAIL_WEBHOOK_URL: "${EMAIL_WEBHOOK_URL:-}"
+      EMAIL_API_KEY: "${EMAIL_API_KEY:-}"
+      EMAIL_FROM: "${EMAIL_FROM:-}"
     restart: unless-stopped
 
   postgres:

@@ -105,26 +105,65 @@ async function createAuthToken({ email, purpose, userId = null, metadata = null 
   return raw;
 }
 
+function parseFromHeader(from) {
+  const match = String(from).match(/^([^<]*?)\s*<([^>]+)>$/);
+  return match
+    ? { name: match[1].trim(), email: match[2].trim() }
+    : { email: String(from).trim() };
+}
+
 async function deliverEmail(to, subject, text, html) {
-  if (!config.emailWebhookUrl) {
-    console.log(`[Gamdle email] ${to}\n${text}`);
+  if (config.emailApiKey) {
+    const sender = parseFromHeader(config.emailFrom);
+    let response;
+    try {
+      response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': config.emailApiKey,
+          'Content-Type': 'application/json',
+          'accept': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: { name: sender.name, email: sender.email },
+          to: [{ email: to }],
+          subject,
+          htmlContent: html,
+          textContent: text,
+        }),
+      });
+    } catch (error) {
+      console.error('Brevo API network error:', error);
+      throw new Error('Email delivery failed.');
+    }
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      console.error(`Brevo API returned ${response.status} for ${to}: ${body}`);
+      throw new Error('Email delivery failed.');
+    }
     return;
   }
-  let response;
-  try {
-    response = await fetch(config.emailWebhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, subject, text, html }),
-    });
-  } catch (error) {
-    console.error('Email webhook network error:', error);
-    throw new Error('Email delivery failed.');
+
+  if (config.emailWebhookUrl) {
+    let response;
+    try {
+      response = await fetch(config.emailWebhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, subject, text, html }),
+      });
+    } catch (error) {
+      console.error('Email webhook network error:', error);
+      throw new Error('Email delivery failed.');
+    }
+    if (!response.ok) {
+      console.error(`Email webhook returned ${response.status} for ${to}`);
+      throw new Error('Email delivery failed.');
+    }
+    return;
   }
-  if (!response.ok) {
-    console.error(`Email webhook returned ${response.status} for ${to}`);
-    throw new Error('Email delivery failed.');
-  }
+
+  console.log(`[Gamdle email] ${to}\n${text}`);
 }
 
 async function sendLink(email, purpose, userId = null, metadata = null) {

@@ -338,7 +338,13 @@ input::placeholder { color: var(--dim); opacity: 1; }
 #wheel-numbers .green-pocket { fill: var(--primary-strong); }
 #wheel-numbers .red-pocket { fill: var(--red); }
 #wheel-numbers .black-pocket { fill: oklch(0.12 0.01 150); }
+#wheel-numbers path.pocket-lit {
+  fill: var(--accent);
+  filter: drop-shadow(0 0 6px var(--accent));
+  transition: fill 60ms ease-out;
+}
 #wheel-numbers text { fill: var(--ink); font-size: 8px; font-weight: 800; text-anchor: middle; dominant-baseline: middle; }
+#wheel-numbers path.pocket-lit + text { fill: oklch(0.15 0.02 65); }
 .wheel-result {
   position: absolute;
   right: -0.5rem;

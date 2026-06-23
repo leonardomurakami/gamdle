@@ -530,6 +530,9 @@ async function placeWager() {
       renderControls();
       gameAnimations.reset(nextTable);
       $('#result-ribbon').hidden = true;
+    } else if (state.run.status === 'active') {
+      renderStage();
+      renderControls();
     }
   } catch (error) {
     showToast(error.message);

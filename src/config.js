@@ -22,6 +22,8 @@ export const config = {
   databasePath: process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'gamdle.sqlite'),
   dailySeedSecret,
   emailWebhookUrl: process.env.EMAIL_WEBHOOK_URL || '',
+  emailApiKey: process.env.EMAIL_API_KEY || '',
+  emailFrom: process.env.EMAIL_FROM || 'Gamdle <noreply@yourdomain.com>',
   isProduction,
   loginTtlMs: 15 * 60 * 1000,
   sessionTtlMs: 30 * 24 * 60 * 60 * 1000,
